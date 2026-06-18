@@ -1,3 +1,7 @@
+/// Flutter plugin for reading video metadata and extracting cover images with
+/// bundled LGPL FFmpeg libraries.
+library;
+
 export 'src/lgpl_ffmpeg_flutter.dart';
 export 'src/method_channel_lgpl_ffmpeg_flutter.dart'
     show MethodChannelLgplFfmpegFlutter;

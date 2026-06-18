@@ -5,7 +5,9 @@ import 'lgpl_ffmpeg_flutter_platform.dart';
 import 'video_info.dart';
 import 'video_process_error.dart';
 
+/// Method channel implementation of [LgplFfmpegFlutterPlatform].
 class MethodChannelLgplFfmpegFlutter extends LgplFfmpegFlutterPlatform {
+  /// Channel used to call the native Android and iOS implementations.
   @visibleForTesting
   final methodChannel = const MethodChannel('lgpl_ffmpeg_flutter');
 

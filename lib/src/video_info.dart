@@ -1,4 +1,6 @@
+/// Basic metadata for a video file.
 class VideoInfo {
+  /// Creates video metadata returned by the native backend.
   const VideoInfo({
     required this.duration,
     this.width,
@@ -8,6 +10,7 @@ class VideoInfo {
     this.mimeType = '',
   });
 
+  /// Converts a native method-channel result map into [VideoInfo].
   factory VideoInfo.fromMap(Map<Object?, Object?> map) {
     final durationMs = map['durationMs'];
     if (durationMs is! int) {
@@ -24,10 +27,21 @@ class VideoInfo {
     );
   }
 
+  /// Playback duration of the video.
   final Duration duration;
+
+  /// Encoded video width in pixels, when available.
   final int? width;
+
+  /// Encoded video height in pixels, when available.
   final int? height;
+
+  /// Rotation metadata in degrees.
   final int rotation;
+
+  /// Video bitrate in bits per second, when available.
   final int? bitrate;
+
+  /// Container or stream MIME type reported by the native backend.
   final String mimeType;
 }
