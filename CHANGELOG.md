@@ -1,3 +1,10 @@
+## 0.0.3
+
+* Fixed pub.dev package scoring items by documenting the current release in the
+  changelog.
+* Improved public API dartdoc coverage for the plugin entry point, platform
+  interface, video metadata, and error types.
+
 ## 0.0.2
 
 * Added bundled LGPL FFmpeg binaries and framework metadata for Android and

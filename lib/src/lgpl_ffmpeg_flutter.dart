@@ -17,8 +17,8 @@ class LgplFfmpegFlutter {
   ///
   /// [preferredTimes] lets callers provide candidate timestamps. The native
   /// backend chooses the first timestamp that can produce a frame. [maxLongEdge]
-  /// limits the generated image size and [quality] controls JPEG quality from
-  /// 1 to 100. Returns the generated cover path, or `null` if no cover was
+  /// limits the generated image size and [quality] is an output quality value
+  /// from 1 to 100. Returns the generated cover path, or `null` if no cover was
   /// produced.
   static Future<String?> generateCover({
     required String videoPath,
