@@ -16,6 +16,9 @@ Required LGPL-oriented configure flags used by scripts/build_ffmpeg_lgpl.sh:
 --enable-avutil
 --enable-swscale
 --enable-swresample
+--enable-zlib
+--enable-encoder=png
+--enable-muxer=image2
 --enable-protocol=file
 --enable-demuxer=mov
 --enable-demuxer=matroska

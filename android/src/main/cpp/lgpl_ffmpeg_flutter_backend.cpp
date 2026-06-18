@@ -203,6 +203,47 @@ bool DecodeFrameAt(AVFormatContext* format_context,
   return decoded;
 }
 
+bool WritePngFile(const std::string& output_path, const AVFrame* rgb_frame) {
+  const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_PNG);
+  if (codec == nullptr) {
+    return false;
+  }
+
+  AVCodecContext* codec_context = avcodec_alloc_context3(codec);
+  if (codec_context == nullptr) {
+    return false;
+  }
+  codec_context->width = rgb_frame->width;
+  codec_context->height = rgb_frame->height;
+  codec_context->pix_fmt = AV_PIX_FMT_RGB24;
+  codec_context->time_base = AVRational{1, 1};
+  if (avcodec_open2(codec_context, codec, nullptr) < 0) {
+    avcodec_free_context(&codec_context);
+    return false;
+  }
+
+  AVPacket* packet = av_packet_alloc();
+  if (packet == nullptr) {
+    avcodec_free_context(&codec_context);
+    return false;
+  }
+
+  bool success = false;
+  if (avcodec_send_frame(codec_context, rgb_frame) == 0 &&
+      avcodec_receive_packet(codec_context, packet) == 0) {
+    FILE* file = std::fopen(output_path.c_str(), "wb");
+    if (file != nullptr) {
+      success = std::fwrite(packet->data, 1, packet->size, file) ==
+                static_cast<size_t>(packet->size);
+      std::fclose(file);
+    }
+  }
+
+  av_packet_free(&packet);
+  avcodec_free_context(&codec_context);
+  return success;
+}
+
 std::string GenerateCover(const std::string& path,
                           const std::vector<int64_t>& preferred_times_ms,
                           int max_long_edge,
@@ -292,10 +333,9 @@ std::string GenerateCover(const std::string& path,
 
   std::ostringstream output_path;
   output_path << cache_dir << "/lgpl_ffmpeg_cover_" << std::time(nullptr)
-              << "_" << std::rand() << ".ppm";
+              << "_" << std::rand() << ".png";
 
-  FILE* file = std::fopen(output_path.str().c_str(), "wb");
-  if (file == nullptr) {
+  if (!WritePngFile(output_path.str(), rgb_frame)) {
     sws_freeContext(sws_context);
     av_frame_free(&rgb_frame);
     av_frame_free(&decoded_frame);
@@ -303,12 +343,6 @@ std::string GenerateCover(const std::string& path,
     avformat_close_input(&format_context);
     return ErrorJson("outputFailed", "Could not create cover file.");
   }
-  std::fprintf(file, "P6\n%d %d\n255\n", out_width, out_height);
-  for (int y = 0; y < out_height; ++y) {
-    std::fwrite(rgb_frame->data[0] + y * rgb_frame->linesize[0], 1,
-                out_width * 3, file);
-  }
-  std::fclose(file);
 
   sws_freeContext(sws_context);
   av_frame_free(&rgb_frame);

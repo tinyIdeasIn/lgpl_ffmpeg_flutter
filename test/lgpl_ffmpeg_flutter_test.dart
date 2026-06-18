@@ -25,7 +25,7 @@ class FakeLgplFfmpegFlutterPlatform
     int maxLongEdge = 1920,
     int quality = 95,
   }) async {
-    return null;
+    return '/tmp/lgpl_ffmpeg_cover.png';
   }
 }
 
@@ -51,14 +51,14 @@ void main() {
     expect(info.mimeType, 'video/mp4');
   });
 
-  test('public API allows null cover path', () async {
+  test('public API returns generated png cover path', () async {
     LgplFfmpegFlutterPlatform.instance = FakeLgplFfmpegFlutterPlatform();
 
     final cover = await LgplFfmpegFlutter.generateCover(
       videoPath: '/tmp/video.mp4',
     );
 
-    expect(cover, isNull);
+    expect(cover, endsWith('.png'));
   });
 
   test('VideoInfo parses method channel map', () {

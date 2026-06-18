@@ -25,7 +25,9 @@ void main() {
                 'mimeType': 'video/mp4',
               };
             case 'generateCover':
-              return <String, Object?>{'coverPath': null};
+              return <String, Object?>{
+                'coverPath': '/tmp/lgpl_ffmpeg_cover.png',
+              };
           }
           throw PlatformException(code: 'unknown');
         });
@@ -57,7 +59,7 @@ void main() {
       quality: 90,
     );
 
-    expect(cover, isNull);
+    expect(cover, endsWith('.png'));
     expect(calls.single.method, 'generateCover');
     expect(calls.single.arguments, <String, Object?>{
       'videoPath': '/tmp/video.mp4',

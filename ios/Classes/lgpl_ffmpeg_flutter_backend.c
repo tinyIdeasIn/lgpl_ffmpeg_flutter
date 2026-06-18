@@ -5,6 +5,7 @@
 #include <libavutil/dict.h>
 #include <libavutil/display.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/opt.h>
 #include <libswscale/swscale.h>
 #include <math.h>
 #include <stdio.h>
@@ -159,6 +160,46 @@ static int decode_frame_at(AVFormatContext* format_context,
   return decoded;
 }
 
+static int write_png_file(const char* output_path, const AVFrame* rgb_frame) {
+  const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_PNG);
+  if (codec == NULL) {
+    return 0;
+  }
+
+  AVCodecContext* codec_context = avcodec_alloc_context3(codec);
+  if (codec_context == NULL) {
+    return 0;
+  }
+  codec_context->width = rgb_frame->width;
+  codec_context->height = rgb_frame->height;
+  codec_context->pix_fmt = AV_PIX_FMT_RGB24;
+  codec_context->time_base = (AVRational){1, 1};
+  if (avcodec_open2(codec_context, codec, NULL) < 0) {
+    avcodec_free_context(&codec_context);
+    return 0;
+  }
+
+  AVPacket* packet = av_packet_alloc();
+  if (packet == NULL) {
+    avcodec_free_context(&codec_context);
+    return 0;
+  }
+
+  int success = 0;
+  if (avcodec_send_frame(codec_context, rgb_frame) == 0 &&
+      avcodec_receive_packet(codec_context, packet) == 0) {
+    FILE* file = fopen(output_path, "wb");
+    if (file != NULL) {
+      success = fwrite(packet->data, 1, packet->size, file) == (size_t)packet->size;
+      fclose(file);
+    }
+  }
+
+  av_packet_free(&packet);
+  avcodec_free_context(&codec_context);
+  return success;
+}
+
 char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
                                          const long long* preferred_times_ms,
                                          int preferred_times_count,
@@ -254,10 +295,9 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
             rgb_frame->linesize);
 
   char output_path[1024];
-  snprintf(output_path, sizeof(output_path), "%s/lgpl_ffmpeg_cover_%ld_%d.ppm",
+  snprintf(output_path, sizeof(output_path), "%s/lgpl_ffmpeg_cover_%ld_%d.png",
            cache_dir, time(NULL), rand());
-  FILE* file = fopen(output_path, "wb");
-  if (file == NULL) {
+  if (!write_png_file(output_path, rgb_frame)) {
     sws_freeContext(sws_context);
     av_frame_free(&rgb_frame);
     av_frame_free(&decoded_frame);
@@ -265,12 +305,6 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
     avformat_close_input(&format_context);
     return error_json("outputFailed", "Could not create cover file.");
   }
-  fprintf(file, "P6\n%d %d\n255\n", out_width, out_height);
-  for (int y = 0; y < out_height; y++) {
-    fwrite(rgb_frame->data[0] + y * rgb_frame->linesize[0], 1, out_width * 3,
-           file);
-  }
-  fclose(file);
 
   sws_freeContext(sws_context);
   av_frame_free(&rgb_frame);
