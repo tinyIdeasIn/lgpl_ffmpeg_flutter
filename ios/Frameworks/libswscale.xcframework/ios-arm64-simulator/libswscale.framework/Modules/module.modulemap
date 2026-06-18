@@ -1,0 +1,5 @@
+framework module libswscale {
+  umbrella "Headers"
+  export *
+  module * { export * }
+}

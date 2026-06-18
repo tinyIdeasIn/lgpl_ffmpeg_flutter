@@ -1,0 +1,5 @@
+framework module libavcodec {
+  umbrella "Headers"
+  export *
+  module * { export * }
+}

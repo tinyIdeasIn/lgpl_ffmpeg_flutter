@@ -1,0 +1,20 @@
+# Local and build output
+.dart_tool/
+.ffmpeg_build/
+build/
+coverage/
+.flutter-plugins-dependencies
+pubspec.lock
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+
+# Internal planning notes
+LOG.md
+TODO.md
+
+# Generated docs/cache
+**/doc/api/

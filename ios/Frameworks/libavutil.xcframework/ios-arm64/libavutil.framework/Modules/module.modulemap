@@ -1,0 +1,5 @@
+framework module libavutil {
+  umbrella "Headers"
+  export *
+  module * { export * }
+}
