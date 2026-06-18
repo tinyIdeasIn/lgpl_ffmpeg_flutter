@@ -39,15 +39,73 @@ final cover = await LgplFfmpegFlutter.generateCover(
 );
 
 print(info.duration);
-print(cover?.coverPath);
+print(cover);
 ```
 
-`generateCover` writes a `.ppm` image file in the platform cache directory.
-Convert that file in the host app if JPEG or PNG output is required.
+`readInfo` returns a `VideoInfo` value with the following fields:
+
+- `duration`: video duration.
+- `width` and `height`: encoded video dimensions when available.
+- `rotation`: display rotation in degrees, defaulting to `0`.
+- `bitrate`: stream bitrate when available.
+- `mimeType`: container or video MIME type when available.
+
+`generateCover` writes a `.png` image file in the platform cache directory.
 
 `generateCover` returns `null` when the video can be opened but no candidate
 time produces a frame. If native FFmpeg libraries are unavailable, the plugin
 throws a structured `ffmpegUnavailable` error.
+
+`generateCover` accepts these options:
+
+- `preferredTimes`: candidate timestamps to try in order. When omitted, the
+  native implementation chooses fallback timestamps.
+- `maxLongEdge`: maximum output width or height after scaling. The value must
+  be greater than `0`; the default is `1920`.
+- `quality`: reserved output quality value from `1` to `100`; the default is
+  `95`.
+
+Errors from the platform layer are surfaced as `VideoProcessException`.
+Known error codes include:
+
+- `invalidPath`: the input path is empty or otherwise invalid. The Dart API
+  also uses this code for `maxLongEdge <= 0` or `quality` outside `1..100`
+  before invoking the platform layer.
+- `invalidArgument`: native arguments are malformed, including platform-layer
+  validation failures for `maxLongEdge` or `quality`.
+- `openFailed`: FFmpeg could not open the local video file.
+- `noVideoStream`: the input file does not contain a video stream.
+- `readInfoFailed`: metadata probing failed.
+- `decodeFailed`: a frame could not be decoded.
+- `outputFailed`: cover file creation, scaling, or rotation failed.
+- `ffmpegUnavailable`: bundled native FFmpeg libraries could not be loaded.
+- `unknown`: fallback for an unrecognized platform error code.
+
+```dart
+try {
+  final coverPath = await LgplFfmpegFlutter.generateCover(
+    videoPath: video.path,
+  );
+  if (coverPath != null) {
+    // The path points to a generated .png file in the platform cache directory.
+  }
+} on VideoProcessException catch (error) {
+  // Handle error.code and error.message in the host app.
+}
+```
+
+## Example App
+
+The `example` app lets you pick a local video, read its metadata, generate a
+cover frame, and preview the generated image path.
+
+```sh
+cd example
+flutter run
+```
+
+On Android, run the example on an `arm64-v8a` device or emulator unless you
+have rebuilt and bundled FFmpeg libraries for another ABI.
 
 ## Bundled FFmpeg
 
