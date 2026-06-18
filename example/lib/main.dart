@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:lgpl_ffmpeg_flutter/lgpl_ffmpeg_flutter.dart';
@@ -113,9 +115,133 @@ class _VideoProbePageState extends State<VideoProbePage> {
             _InfoRow(label: 'Bitrate', value: '${info.bitrate ?? '-'}'),
             _InfoRow(label: 'MIME type', value: info.mimeType),
           ],
-          if (_coverPath != null)
+          if (_coverPath != null) ...[
+            _CoverPreview(coverPath: _coverPath!),
+            const SizedBox(height: 16),
             _InfoRow(label: 'Cover path', value: _coverPath!),
+          ],
         ],
+      ),
+    );
+  }
+}
+
+class _CoverPreview extends StatelessWidget {
+  const _CoverPreview({required this.coverPath});
+
+  final String coverPath;
+
+  @override
+  Widget build(BuildContext context) {
+    final imageFile = File(coverPath);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Cover', style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 8),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 360),
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: Material(
+              clipBehavior: Clip.antiAlias,
+              color: colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(8),
+              child: InkWell(
+                onTap: () => _openCoverViewer(context, coverPath),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Image.file(
+                      imageFile,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(20),
+                            child: Text(
+                              'Unable to load cover image.',
+                              style: TextStyle(color: colorScheme.error),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    Positioned(
+                      right: 8,
+                      bottom: 8,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.54),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Padding(
+                          padding: EdgeInsets.all(8),
+                          child: Icon(
+                            Icons.fullscreen,
+                            color: Colors.white,
+                            size: 22,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _openCoverViewer(BuildContext context, String coverPath) {
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => _CoverViewerPage(coverPath: coverPath),
+      ),
+    );
+  }
+}
+
+class _CoverViewerPage extends StatelessWidget {
+  const _CoverViewerPage({required this.coverPath});
+
+  final String coverPath;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: const Text('Cover'),
+      ),
+      body: SafeArea(
+        child: Center(
+          child: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 5,
+            child: Image.file(
+              File(coverPath),
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) {
+                return const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    'Unable to load cover image.',
+                    style: TextStyle(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 #include <jni.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -93,6 +94,14 @@ int RotationForStream(const AVStream* stream) {
   AVDictionaryEntry* rotate =
       av_dict_get(stream->metadata, "rotate", nullptr, 0);
   return rotate == nullptr ? 0 : std::atoi(rotate->value);
+}
+
+int NormalizeRightAngle(int rotation) {
+  rotation %= 360;
+  if (rotation < 0) {
+    rotation += 360;
+  }
+  return ((rotation + 45) / 90 * 90) % 360;
 }
 
 std::string MimeTypeForInput(const std::string& path,
@@ -244,6 +253,72 @@ bool WritePngFile(const std::string& output_path, const AVFrame* rgb_frame) {
   return success;
 }
 
+AVFrame* AllocateRgbFrame(int width, int height) {
+  AVFrame* frame = av_frame_alloc();
+  if (frame == nullptr) {
+    return nullptr;
+  }
+  frame->format = AV_PIX_FMT_RGB24;
+  frame->width = width;
+  frame->height = height;
+  if (av_frame_get_buffer(frame, 32) < 0) {
+    av_frame_free(&frame);
+    return nullptr;
+  }
+  return frame;
+}
+
+void CopyRgbPixel(const AVFrame* source,
+                  AVFrame* destination,
+                  int source_x,
+                  int source_y,
+                  int destination_x,
+                  int destination_y) {
+  const uint8_t* source_pixel =
+      source->data[0] + source_y * source->linesize[0] + source_x * 3;
+  uint8_t* destination_pixel = destination->data[0] +
+                               destination_y * destination->linesize[0] +
+                               destination_x * 3;
+  destination_pixel[0] = source_pixel[0];
+  destination_pixel[1] = source_pixel[1];
+  destination_pixel[2] = source_pixel[2];
+}
+
+AVFrame* RotateRgbFrame(const AVFrame* source, int rotation) {
+  const int normalized_rotation = NormalizeRightAngle(rotation);
+  if (normalized_rotation == 0) {
+    return nullptr;
+  }
+
+  const bool swaps_axes =
+      normalized_rotation == 90 || normalized_rotation == 270;
+  AVFrame* rotated = AllocateRgbFrame(swaps_axes ? source->height : source->width,
+                                      swaps_axes ? source->width : source->height);
+  if (rotated == nullptr) {
+    return nullptr;
+  }
+
+  for (int y = 0; y < source->height; y++) {
+    for (int x = 0; x < source->width; x++) {
+      int destination_x = x;
+      int destination_y = y;
+      if (normalized_rotation == 90) {
+        destination_x = source->height - 1 - y;
+        destination_y = x;
+      } else if (normalized_rotation == 180) {
+        destination_x = source->width - 1 - x;
+        destination_y = source->height - 1 - y;
+      } else if (normalized_rotation == 270) {
+        destination_x = y;
+        destination_y = source->width - 1 - x;
+      }
+      CopyRgbPixel(source, rotated, x, y, destination_x, destination_y);
+    }
+  }
+
+  return rotated;
+}
+
 std::string GenerateCover(const std::string& path,
                           const std::vector<int64_t>& preferred_times_ms,
                           int max_long_edge,
@@ -261,6 +336,7 @@ std::string GenerateCover(const std::string& path,
   }
 
   AVStream* stream = format_context->streams[video_stream_index];
+  const int rotation = NormalizeRightAngle(RotationForStream(stream));
   const AVCodec* codec = avcodec_find_decoder(stream->codecpar->codec_id);
   if (codec == nullptr) {
     avformat_close_input(&format_context);
@@ -311,11 +387,13 @@ std::string GenerateCover(const std::string& path,
   const int out_width = std::max(1, static_cast<int>(source_width * scale));
   const int out_height = std::max(1, static_cast<int>(source_height * scale));
 
-  AVFrame* rgb_frame = av_frame_alloc();
-  rgb_frame->format = AV_PIX_FMT_RGB24;
-  rgb_frame->width = out_width;
-  rgb_frame->height = out_height;
-  av_frame_get_buffer(rgb_frame, 32);
+  AVFrame* rgb_frame = AllocateRgbFrame(out_width, out_height);
+  if (rgb_frame == nullptr) {
+    av_frame_free(&decoded_frame);
+    avcodec_free_context(&codec_context);
+    avformat_close_input(&format_context);
+    return ErrorJson("outputFailed", "Could not allocate cover frame.");
+  }
 
   SwsContext* sws_context = sws_getContext(
       source_width, source_height, codec_context->pix_fmt, out_width, out_height,
@@ -331,12 +409,29 @@ std::string GenerateCover(const std::string& path,
   sws_scale(sws_context, decoded_frame->data, decoded_frame->linesize, 0,
             source_height, rgb_frame->data, rgb_frame->linesize);
 
+  AVFrame* cover_frame = rgb_frame;
+  AVFrame* rotated_frame = RotateRgbFrame(rgb_frame, rotation);
+  if (rotation != 0) {
+    if (rotated_frame == nullptr) {
+      sws_freeContext(sws_context);
+      av_frame_free(&rgb_frame);
+      av_frame_free(&decoded_frame);
+      avcodec_free_context(&codec_context);
+      avformat_close_input(&format_context);
+      return ErrorJson("outputFailed", "Could not rotate cover frame.");
+    }
+    cover_frame = rotated_frame;
+  }
+
   std::ostringstream output_path;
   output_path << cache_dir << "/lgpl_ffmpeg_cover_" << std::time(nullptr)
               << "_" << std::rand() << ".png";
 
-  if (!WritePngFile(output_path.str(), rgb_frame)) {
+  if (!WritePngFile(output_path.str(), cover_frame)) {
     sws_freeContext(sws_context);
+    if (rotated_frame != nullptr) {
+      av_frame_free(&rotated_frame);
+    }
     av_frame_free(&rgb_frame);
     av_frame_free(&decoded_frame);
     avcodec_free_context(&codec_context);
@@ -345,6 +440,9 @@ std::string GenerateCover(const std::string& path,
   }
 
   sws_freeContext(sws_context);
+  if (rotated_frame != nullptr) {
+    av_frame_free(&rotated_frame);
+  }
   av_frame_free(&rgb_frame);
   av_frame_free(&decoded_frame);
   avcodec_free_context(&codec_context);

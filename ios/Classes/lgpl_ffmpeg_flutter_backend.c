@@ -59,6 +59,14 @@ static int rotation_for_stream(const AVStream* stream) {
   return rotate == NULL ? 0 : atoi(rotate->value);
 }
 
+static int normalize_right_angle(int rotation) {
+  rotation %= 360;
+  if (rotation < 0) {
+    rotation += 360;
+  }
+  return ((rotation + 45) / 90 * 90) % 360;
+}
+
 static const char* mime_type_for_input(const char* path,
                                        const AVInputFormat* input_format) {
   if (input_format != NULL && input_format->mime_type != NULL) {
@@ -200,6 +208,71 @@ static int write_png_file(const char* output_path, const AVFrame* rgb_frame) {
   return success;
 }
 
+static AVFrame* allocate_rgb_frame(int width, int height) {
+  AVFrame* frame = av_frame_alloc();
+  if (frame == NULL) {
+    return NULL;
+  }
+  frame->format = AV_PIX_FMT_RGB24;
+  frame->width = width;
+  frame->height = height;
+  if (av_frame_get_buffer(frame, 32) < 0) {
+    av_frame_free(&frame);
+    return NULL;
+  }
+  return frame;
+}
+
+static void copy_rgb_pixel(const AVFrame* source,
+                           AVFrame* destination,
+                           int source_x,
+                           int source_y,
+                           int destination_x,
+                           int destination_y) {
+  const uint8_t* source_pixel =
+      source->data[0] + source_y * source->linesize[0] + source_x * 3;
+  uint8_t* destination_pixel = destination->data[0] +
+                               destination_y * destination->linesize[0] +
+                               destination_x * 3;
+  destination_pixel[0] = source_pixel[0];
+  destination_pixel[1] = source_pixel[1];
+  destination_pixel[2] = source_pixel[2];
+}
+
+static AVFrame* rotate_rgb_frame(const AVFrame* source, int rotation) {
+  int normalized_rotation = normalize_right_angle(rotation);
+  if (normalized_rotation == 0) {
+    return NULL;
+  }
+
+  int swaps_axes = normalized_rotation == 90 || normalized_rotation == 270;
+  AVFrame* rotated = allocate_rgb_frame(swaps_axes ? source->height : source->width,
+                                        swaps_axes ? source->width : source->height);
+  if (rotated == NULL) {
+    return NULL;
+  }
+
+  for (int y = 0; y < source->height; y++) {
+    for (int x = 0; x < source->width; x++) {
+      int destination_x = x;
+      int destination_y = y;
+      if (normalized_rotation == 90) {
+        destination_x = source->height - 1 - y;
+        destination_y = x;
+      } else if (normalized_rotation == 180) {
+        destination_x = source->width - 1 - x;
+        destination_y = source->height - 1 - y;
+      } else if (normalized_rotation == 270) {
+        destination_x = y;
+        destination_y = source->width - 1 - x;
+      }
+      copy_rgb_pixel(source, rotated, x, y, destination_x, destination_y);
+    }
+  }
+
+  return rotated;
+}
+
 char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
                                          const long long* preferred_times_ms,
                                          int preferred_times_count,
@@ -218,6 +291,7 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
   }
 
   AVStream* stream = format_context->streams[video_stream_index];
+  int rotation = normalize_right_angle(rotation_for_stream(stream));
   const AVCodec* codec = avcodec_find_decoder(stream->codecpar->codec_id);
   if (codec == NULL) {
     avformat_close_input(&format_context);
@@ -273,11 +347,13 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
   if (out_width < 1) out_width = 1;
   if (out_height < 1) out_height = 1;
 
-  AVFrame* rgb_frame = av_frame_alloc();
-  rgb_frame->format = AV_PIX_FMT_RGB24;
-  rgb_frame->width = out_width;
-  rgb_frame->height = out_height;
-  av_frame_get_buffer(rgb_frame, 32);
+  AVFrame* rgb_frame = allocate_rgb_frame(out_width, out_height);
+  if (rgb_frame == NULL) {
+    av_frame_free(&decoded_frame);
+    avcodec_free_context(&codec_context);
+    avformat_close_input(&format_context);
+    return error_json("outputFailed", "Could not allocate cover frame.");
+  }
 
   struct SwsContext* sws_context =
       sws_getContext(source_width, source_height, codec_context->pix_fmt, out_width,
@@ -294,11 +370,28 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
             decoded_frame->linesize, 0, source_height, rgb_frame->data,
             rgb_frame->linesize);
 
+  AVFrame* cover_frame = rgb_frame;
+  AVFrame* rotated_frame = rotate_rgb_frame(rgb_frame, rotation);
+  if (rotation != 0) {
+    if (rotated_frame == NULL) {
+      sws_freeContext(sws_context);
+      av_frame_free(&rgb_frame);
+      av_frame_free(&decoded_frame);
+      avcodec_free_context(&codec_context);
+      avformat_close_input(&format_context);
+      return error_json("outputFailed", "Could not rotate cover frame.");
+    }
+    cover_frame = rotated_frame;
+  }
+
   char output_path[1024];
   snprintf(output_path, sizeof(output_path), "%s/lgpl_ffmpeg_cover_%ld_%d.png",
            cache_dir, time(NULL), rand());
-  if (!write_png_file(output_path, rgb_frame)) {
+  if (!write_png_file(output_path, cover_frame)) {
     sws_freeContext(sws_context);
+    if (rotated_frame != NULL) {
+      av_frame_free(&rotated_frame);
+    }
     av_frame_free(&rgb_frame);
     av_frame_free(&decoded_frame);
     avcodec_free_context(&codec_context);
@@ -307,6 +400,9 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
   }
 
   sws_freeContext(sws_context);
+  if (rotated_frame != NULL) {
+    av_frame_free(&rotated_frame);
+  }
   av_frame_free(&rgb_frame);
   av_frame_free(&decoded_frame);
   avcodec_free_context(&codec_context);
