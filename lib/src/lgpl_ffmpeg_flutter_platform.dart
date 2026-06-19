@@ -52,4 +52,14 @@ abstract class LgplFfmpegFlutterPlatform extends PlatformInterface {
   }) {
     throw UnimplementedError('generateCoverImage() has not been implemented.');
   }
+
+  /// Extracts a frame near [time] and returns output metadata.
+  Future<CoverImage?> extractFrame({
+    required String videoPath,
+    required Duration time,
+    int maxLongEdge = 1920,
+    int quality = 95,
+  }) {
+    throw UnimplementedError('extractFrame() has not been implemented.');
+  }
 }

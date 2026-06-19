@@ -45,6 +45,14 @@ void main() {
                 'requestedTimeMs': 300,
                 'actualTimeMs': 320,
               };
+            case 'extractFrame':
+              return <String, Object?>{
+                'coverPath': '/tmp/lgpl_ffmpeg_frame.png',
+                'width': 640,
+                'height': 360,
+                'requestedTimeMs': 2000,
+                'actualTimeMs': 2040,
+              };
           }
           throw PlatformException(code: 'unknown');
         });
@@ -101,6 +109,26 @@ void main() {
     expect(cover?.requestedTime, const Duration(milliseconds: 300));
     expect(cover?.actualTime, const Duration(milliseconds: 320));
     expect(calls.single.method, 'generateCover');
+  });
+
+  test('extractFrame sends requested time as milliseconds', () async {
+    final frame = await platform.extractFrame(
+      videoPath: '/tmp/video.mp4',
+      time: const Duration(seconds: 2),
+      maxLongEdge: 640,
+      quality: 90,
+    );
+
+    expect(frame?.path, '/tmp/lgpl_ffmpeg_frame.png');
+    expect(frame?.requestedTime, const Duration(seconds: 2));
+    expect(frame?.actualTime, const Duration(milliseconds: 2040));
+    expect(calls.single.method, 'extractFrame');
+    expect(calls.single.arguments, <String, Object?>{
+      'videoPath': '/tmp/video.mp4',
+      'timeMs': 2000,
+      'maxLongEdge': 640,
+      'quality': 90,
+    });
   });
 
   test('backendInfo sends the controlled diagnostic method', () async {

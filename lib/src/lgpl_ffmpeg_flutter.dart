@@ -55,4 +55,19 @@ class LgplFfmpegFlutter {
       quality: quality,
     );
   }
+
+  /// Extracts a frame near [time] and returns metadata for the generated PNG.
+  static Future<CoverImage?> extractFrame({
+    required String videoPath,
+    required Duration time,
+    int maxLongEdge = 1920,
+    int quality = 95,
+  }) {
+    return LgplFfmpegFlutterPlatform.instance.extractFrame(
+      videoPath: videoPath,
+      time: time,
+      maxLongEdge: maxLongEdge,
+      quality: quality,
+    );
+  }
 }

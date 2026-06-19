@@ -102,6 +102,44 @@ class MethodChannelLgplFfmpegFlutter extends LgplFfmpegFlutterPlatform {
     }
   }
 
+  @override
+  Future<CoverImage?> extractFrame({
+    required String videoPath,
+    required Duration time,
+    int maxLongEdge = 1920,
+    int quality = 95,
+  }) async {
+    _validateVideoPath(videoPath);
+    if (maxLongEdge <= 0) {
+      throw const VideoProcessException(
+        code: VideoProcessErrorCode.invalidPath,
+        message: 'maxLongEdge must be greater than 0.',
+      );
+    }
+    if (quality < 1 || quality > 100) {
+      throw const VideoProcessException(
+        code: VideoProcessErrorCode.invalidPath,
+        message: 'quality must be between 1 and 100.',
+      );
+    }
+
+    try {
+      final result = await methodChannel
+          .invokeMapMethod<Object?, Object?>('extractFrame', <String, Object?>{
+            'videoPath': videoPath,
+            'timeMs': time.inMilliseconds,
+            'maxLongEdge': maxLongEdge,
+            'quality': quality,
+          });
+      if (result == null || result['coverPath'] == null) {
+        return null;
+      }
+      return CoverImage.fromMap(result);
+    } on PlatformException catch (exception) {
+      throw VideoProcessException.fromPlatformException(exception);
+    }
+  }
+
   void _validateVideoPath(String videoPath) {
     if (videoPath.trim().isEmpty) {
       throw const VideoProcessException(

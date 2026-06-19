@@ -59,6 +59,22 @@ class FakeLgplFfmpegFlutterPlatform
       actualTime: Duration(milliseconds: 960),
     );
   }
+
+  @override
+  Future<CoverImage?> extractFrame({
+    required String videoPath,
+    required Duration time,
+    int maxLongEdge = 1920,
+    int quality = 95,
+  }) async {
+    return CoverImage(
+      path: '/tmp/lgpl_ffmpeg_frame.png',
+      width: 640,
+      height: 360,
+      requestedTime: time,
+      actualTime: const Duration(milliseconds: 2040),
+    );
+  }
 }
 
 void main() {
@@ -120,6 +136,24 @@ void main() {
     expect(cover?.requestedTime, const Duration(seconds: 1));
     expect(cover?.actualTime, const Duration(milliseconds: 960));
   });
+
+  test(
+    'public API delegates extractFrame to platform implementation',
+    () async {
+      LgplFfmpegFlutterPlatform.instance = FakeLgplFfmpegFlutterPlatform();
+
+      final frame = await LgplFfmpegFlutter.extractFrame(
+        videoPath: '/tmp/video.mp4',
+        time: const Duration(seconds: 2),
+      );
+
+      expect(frame?.path, endsWith('.png'));
+      expect(frame?.width, 640);
+      expect(frame?.height, 360);
+      expect(frame?.requestedTime, const Duration(seconds: 2));
+      expect(frame?.actualTime, const Duration(milliseconds: 2040));
+    },
+  );
 
   test('CoverImage parses method channel map', () {
     final cover = CoverImage.fromMap(<Object?, Object?>{

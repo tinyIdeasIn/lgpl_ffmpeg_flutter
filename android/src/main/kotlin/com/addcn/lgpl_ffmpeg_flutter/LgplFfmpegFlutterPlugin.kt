@@ -29,6 +29,7 @@ class LgplFfmpegFlutterPlugin :
             "readInfo" -> handleReadInfo(call, result)
             "backendInfo" -> handleBackendInfo(result)
             "generateCover" -> handleGenerateCover(call, result)
+            "extractFrame" -> handleExtractFrame(call, result)
             else -> result.notImplemented()
         }
     }
@@ -80,6 +81,39 @@ class LgplFfmpegFlutterPlugin :
         }
 
         runBackend(result) { nativeReadInfo(videoPath) }
+    }
+
+    private fun handleExtractFrame(
+        call: MethodCall,
+        result: Result
+    ) {
+        val videoPath = call.argument<String>("videoPath")
+        if (videoPath.isNullOrBlank()) {
+            result.error("invalidPath", "videoPath must not be empty.", null)
+            return
+        }
+
+        val timeMs = call.argument<Number>("timeMs")?.toLong() ?: 0L
+        val maxLongEdge = call.argument<Int>("maxLongEdge") ?: 1920
+        val quality = call.argument<Int>("quality") ?: 95
+        if (maxLongEdge <= 0 || quality !in 1..100) {
+            result.error(
+                "invalidArgument",
+                "maxLongEdge must be greater than 0 and quality must be between 1 and 100.",
+                null
+            )
+            return
+        }
+
+        runBackend(result) {
+            nativeGenerateCover(
+                videoPath,
+                longArrayOf(timeMs),
+                maxLongEdge,
+                quality,
+                applicationContext.cacheDir.absolutePath
+            )
+        }
     }
 
     private fun handleBackendInfo(result: Result) {
