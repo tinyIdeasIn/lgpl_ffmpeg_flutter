@@ -1,3 +1,12 @@
+## 0.1.0
+
+* Added structured `CoverImage` results through `generateCoverImage`.
+* Added `extractFrame` for best-effort PNG frame extraction near a requested
+  timestamp.
+* Added `deleteGeneratedFiles` for removing plugin-generated cache files.
+* Expanded `backendInfo` with bundled input format, decoder, and output image
+  capability details.
+
 ## 0.0.4
 
 * Added `backendInfo` for inspecting bundled FFmpeg version, configuration, and

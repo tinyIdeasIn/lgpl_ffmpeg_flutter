@@ -34,17 +34,27 @@ import 'package:lgpl_ffmpeg_flutter/lgpl_ffmpeg_flutter.dart';
 final info = await LgplFfmpegFlutter.readInfo(videoPath: video.path);
 final backend = await LgplFfmpegFlutter.backendInfo();
 
-final cover = await LgplFfmpegFlutter.generateCover(
+final cover = await LgplFfmpegFlutter.generateCoverImage(
   videoPath: video.path,
   preferredTimes: const [Duration(seconds: 1), Duration(seconds: 3)],
   maxLongEdge: 1280,
   quality: 90,
 );
 
+final frame = await LgplFfmpegFlutter.extractFrame(
+  videoPath: video.path,
+  time: const Duration(seconds: 5),
+  maxLongEdge: 720,
+);
+
+final deletedCount = await LgplFfmpegFlutter.deleteGeneratedFiles();
+
 print(info.duration);
 print(info.videoCodec);
 print(backend.license);
-print(cover);
+print(cover?.path);
+print(frame?.actualTime);
+print(deletedCount);
 ```
 
 `readInfo` returns a `VideoInfo` value with the following fields:
@@ -66,14 +76,23 @@ print(cover);
   versions.
 - `configuration`: FFmpeg configure arguments compiled into the libraries.
 - `license`: FFmpeg license string reported by libavformat.
+- `supportedInputFormats`: container formats enabled by the bundled build.
+- `supportedVideoDecoders`: video decoders enabled by the bundled build.
+- `supportedAudioDecoders`: audio decoders enabled by the bundled build.
+- `outputImageFormat`: generated image format, currently `png`.
 
-`generateCover` writes a `.png` image file in the platform cache directory.
+`generateCoverImage` writes a `.png` image file in the platform cache directory
+and returns a `CoverImage` value with the generated path, output dimensions,
+requested timestamp, and best-effort decoded frame timestamp.
 
-`generateCover` returns `null` when the video can be opened but no candidate
-time produces a frame. If native FFmpeg libraries are unavailable, the plugin
-throws a structured `ffmpegUnavailable` error.
+`extractFrame` extracts a frame near the requested time and returns the same
+`CoverImage` metadata. Seeking is best-effort and does not guarantee exact
+frame-accurate output.
 
-`generateCover` accepts these options:
+`generateCover` remains available for backwards compatibility and returns only
+the generated PNG path.
+
+`generateCoverImage` accepts these options:
 
 - `preferredTimes`: candidate timestamps to try in order. When omitted, the
   native implementation chooses fallback timestamps.
@@ -81,6 +100,9 @@ throws a structured `ffmpegUnavailable` error.
   be greater than `0`; the default is `1920`.
 - `quality`: reserved output quality value from `1` to `100`; the default is
   `95`.
+
+`deleteGeneratedFiles` removes only plugin-generated `lgpl_ffmpeg_*.png` files
+from the platform cache and returns the number of deleted files.
 
 Errors from the platform layer are surfaced as `VideoProcessException`.
 Known error codes include:

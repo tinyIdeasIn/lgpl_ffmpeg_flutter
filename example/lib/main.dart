@@ -33,7 +33,8 @@ class _VideoProbePageState extends State<VideoProbePage> {
   String? _videoPath;
   VideoInfo? _info;
   FfmpegBackendInfo? _backendInfo;
-  String? _coverPath;
+  CoverImage? _cover;
+  CoverImage? _frame;
   String? _message;
   String? _backendMessage;
   bool _loading = false;
@@ -69,7 +70,8 @@ class _VideoProbePageState extends State<VideoProbePage> {
       _loading = true;
       _message = null;
       _info = null;
-      _coverPath = null;
+      _cover = null;
+      _frame = null;
     });
 
     try {
@@ -86,7 +88,7 @@ class _VideoProbePageState extends State<VideoProbePage> {
       }
 
       final info = await LgplFfmpegFlutter.readInfo(videoPath: path);
-      final coverPath = await LgplFfmpegFlutter.generateCover(
+      final cover = await LgplFfmpegFlutter.generateCoverImage(
         videoPath: path,
         preferredTimes: const [Duration(seconds: 1), Duration(seconds: 3)],
         maxLongEdge: 1280,
@@ -95,7 +97,7 @@ class _VideoProbePageState extends State<VideoProbePage> {
       setState(() {
         _videoPath = path;
         _info = info;
-        _coverPath = coverPath;
+        _cover = cover;
       });
     } on VideoProcessException catch (error) {
       setState(() {
@@ -104,6 +106,64 @@ class _VideoProbePageState extends State<VideoProbePage> {
     } catch (error) {
       setState(() {
         _message = error.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _extractFrame() async {
+    final videoPath = _videoPath;
+    if (videoPath == null) {
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _message = null;
+    });
+
+    try {
+      final frame = await LgplFfmpegFlutter.extractFrame(
+        videoPath: videoPath,
+        time: const Duration(seconds: 5),
+        maxLongEdge: 720,
+      );
+      setState(() {
+        _frame = frame;
+      });
+    } on VideoProcessException catch (error) {
+      setState(() {
+        _message = '${error.code.name}: ${error.message}';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deleteGeneratedFiles() async {
+    setState(() {
+      _loading = true;
+      _message = null;
+    });
+
+    try {
+      final deletedCount = await LgplFfmpegFlutter.deleteGeneratedFiles();
+      setState(() {
+        _cover = null;
+        _frame = null;
+        _message = 'Deleted $deletedCount generated file(s).';
+      });
+    } on VideoProcessException catch (error) {
+      setState(() {
+        _message = '${error.code.name}: ${error.message}';
       });
     } finally {
       if (mounted) {
@@ -133,10 +193,43 @@ class _VideoProbePageState extends State<VideoProbePage> {
                 : const Icon(Icons.video_file_outlined),
             label: Text(_loading ? 'Processing...' : 'Pick video'),
           ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              OutlinedButton(
+                onPressed: _loading || _videoPath == null
+                    ? null
+                    : _extractFrame,
+                child: const Text('Extract frame'),
+              ),
+              OutlinedButton(
+                onPressed: _loading ? null : _deleteGeneratedFiles,
+                child: const Text('Clean generated files'),
+              ),
+            ],
+          ),
           const SizedBox(height: 20),
           if (backendInfo != null) ...[
             _InfoRow(label: 'FFmpeg', value: backendInfo.ffmpegVersion),
             _InfoRow(label: 'FFmpeg license', value: backendInfo.license),
+            _InfoRow(
+              label: 'Input formats',
+              value: backendInfo.supportedInputFormats.join(', '),
+            ),
+            _InfoRow(
+              label: 'Video decoders',
+              value: backendInfo.supportedVideoDecoders.join(', '),
+            ),
+            _InfoRow(
+              label: 'Audio decoders',
+              value: backendInfo.supportedAudioDecoders.join(', '),
+            ),
+            _InfoRow(
+              label: 'Output image',
+              value: backendInfo.outputImageFormat,
+            ),
             _InfoRow(label: 'FFmpeg config', value: backendInfo.configuration),
             const SizedBox(height: 8),
           ] else if (_backendMessage != null) ...[
@@ -162,10 +255,31 @@ class _VideoProbePageState extends State<VideoProbePage> {
                   : '${info.fileSizeBytes} bytes',
             ),
           ],
-          if (_coverPath != null) ...[
-            _CoverPreview(coverPath: _coverPath!),
+          if (_cover != null) ...[
+            _CoverPreview(title: 'Cover', image: _cover!),
             const SizedBox(height: 16),
-            _InfoRow(label: 'Cover path', value: _coverPath!),
+            _InfoRow(label: 'Cover path', value: _cover!.path),
+            _InfoRow(
+              label: 'Cover size',
+              value: '${_cover!.width} x ${_cover!.height}',
+            ),
+            _InfoRow(
+              label: 'Cover time',
+              value: _cover!.actualTime?.toString() ?? '-',
+            ),
+          ],
+          if (_frame != null) ...[
+            _CoverPreview(title: 'Frame', image: _frame!),
+            const SizedBox(height: 16),
+            _InfoRow(label: 'Frame path', value: _frame!.path),
+            _InfoRow(
+              label: 'Frame size',
+              value: '${_frame!.width} x ${_frame!.height}',
+            ),
+            _InfoRow(
+              label: 'Frame time',
+              value: _frame!.actualTime?.toString() ?? '-',
+            ),
           ],
         ],
       ),
@@ -174,19 +288,20 @@ class _VideoProbePageState extends State<VideoProbePage> {
 }
 
 class _CoverPreview extends StatelessWidget {
-  const _CoverPreview({required this.coverPath});
+  const _CoverPreview({required this.title, required this.image});
 
-  final String coverPath;
+  final String title;
+  final CoverImage image;
 
   @override
   Widget build(BuildContext context) {
-    final imageFile = File(coverPath);
+    final imageFile = File(image.path);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Cover', style: Theme.of(context).textTheme.labelLarge),
+        Text(title, style: Theme.of(context).textTheme.labelLarge),
         const SizedBox(height: 8),
         ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 360),
@@ -197,7 +312,7 @@ class _CoverPreview extends StatelessWidget {
               color: colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(8),
               child: InkWell(
-                onTap: () => _openCoverViewer(context, coverPath),
+                onTap: () => _openCoverViewer(context, image.path),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
