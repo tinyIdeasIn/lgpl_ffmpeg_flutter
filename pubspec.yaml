@@ -1,6 +1,6 @@
 name: lgpl_ffmpeg_flutter
 description: "Controlled Flutter wrapper around LGPL FFmpeg dynamic libraries for video info and cover extraction."
-version: 0.0.3
+version: 0.0.4
 homepage: https://github.com/flutter-packagist/lgpl_ffmpeg_flutter
 repository: https://github.com/flutter-packagist/lgpl_ffmpeg_flutter
 topics:
