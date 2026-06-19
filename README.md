@@ -26,7 +26,7 @@ and add FFmpeg dynamic libraries for additional ABIs.
 flutter pub add lgpl_ffmpeg_flutter
 ```
 
-## Usage
+## Quick Start
 
 ```dart
 import 'package:lgpl_ffmpeg_flutter/lgpl_ffmpeg_flutter.dart';
@@ -57,6 +57,8 @@ print(frame?.actualTime);
 print(deletedCount);
 ```
 
+## Reading Video Info
+
 `readInfo` returns a `VideoInfo` value with the following fields:
 
 - `duration`: video duration.
@@ -68,6 +70,16 @@ print(deletedCount);
 - `videoCodec`: FFmpeg video codec name when available.
 - `audioCodec`: FFmpeg audio codec name when available.
 - `fileSizeBytes`: local file size when available.
+
+```dart
+final info = await LgplFfmpegFlutter.readInfo(videoPath: video.path);
+
+debugPrint('duration=${info.duration}');
+debugPrint('size=${info.width}x${info.height}');
+debugPrint('codec=${info.videoCodec}/${info.audioCodec}');
+```
+
+## Backend Diagnostics
 
 `backendInfo` returns runtime diagnostics from the bundled FFmpeg libraries:
 
@@ -81,6 +93,16 @@ print(deletedCount);
 - `supportedAudioDecoders`: audio decoders enabled by the bundled build.
 - `outputImageFormat`: generated image format, currently `png`.
 
+```dart
+final backend = await LgplFfmpegFlutter.backendInfo();
+
+debugPrint(backend.ffmpegVersion);
+debugPrint(backend.supportedInputFormats.join(', '));
+debugPrint(backend.configuration);
+```
+
+## Cover And Frame Extraction
+
 `generateCoverImage` writes a `.png` image file in the platform cache directory
 and returns a `CoverImage` value with the generated path, output dimensions,
 requested timestamp, and best-effort decoded frame timestamp.
@@ -91,6 +113,23 @@ frame-accurate output.
 
 `generateCover` remains available for backwards compatibility and returns only
 the generated PNG path.
+
+```dart
+final cover = await LgplFfmpegFlutter.generateCoverImage(
+  videoPath: video.path,
+  preferredTimes: const [Duration(milliseconds: 300), Duration(seconds: 1)],
+  maxLongEdge: 1280,
+);
+
+final frame = await LgplFfmpegFlutter.extractFrame(
+  videoPath: video.path,
+  time: const Duration(seconds: 5),
+  maxLongEdge: 720,
+);
+
+debugPrint(cover?.path);
+debugPrint('${frame?.width} x ${frame?.height}');
+```
 
 `generateCoverImage` accepts these options:
 
@@ -103,6 +142,13 @@ the generated PNG path.
 
 `deleteGeneratedFiles` removes only plugin-generated `lgpl_ffmpeg_*.png` files
 from the platform cache and returns the number of deleted files.
+
+```dart
+final deletedCount = await LgplFfmpegFlutter.deleteGeneratedFiles();
+debugPrint('Deleted $deletedCount generated image(s).');
+```
+
+## Error Handling
 
 Errors from the platform layer are surfaced as `VideoProcessException`.
 Known error codes include:
@@ -122,10 +168,10 @@ Known error codes include:
 
 ```dart
 try {
-  final coverPath = await LgplFfmpegFlutter.generateCover(
+  final cover = await LgplFfmpegFlutter.generateCoverImage(
     videoPath: video.path,
   );
-  if (coverPath != null) {
+  if (cover != null) {
     // The path points to a generated .png file in the platform cache directory.
   }
 } on VideoProcessException catch (error) {
@@ -136,7 +182,8 @@ try {
 ## Example App
 
 The `example` app lets you pick a local video, read its metadata, generate a
-cover frame, and preview the generated image path.
+cover frame, extract a frame near a chosen timestamp, inspect backend
+capabilities, and clean generated cache files.
 
 ```sh
 cd example

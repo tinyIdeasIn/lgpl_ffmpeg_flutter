@@ -37,6 +37,7 @@ class _VideoProbePageState extends State<VideoProbePage> {
   CoverImage? _frame;
   String? _message;
   String? _backendMessage;
+  double _frameSecond = 5;
   bool _loading = false;
 
   @override
@@ -129,7 +130,7 @@ class _VideoProbePageState extends State<VideoProbePage> {
     try {
       final frame = await LgplFfmpegFlutter.extractFrame(
         videoPath: videoPath,
-        time: const Duration(seconds: 5),
+        time: Duration(milliseconds: (_frameSecond * 1000).round()),
         maxLongEdge: 720,
       );
       setState(() {
@@ -194,6 +195,16 @@ class _VideoProbePageState extends State<VideoProbePage> {
             label: Text(_loading ? 'Processing...' : 'Pick video'),
           ),
           const SizedBox(height: 8),
+          _FrameTimeControl(
+            value: _frameSecond,
+            enabled: !_loading && _videoPath != null,
+            onChanged: (value) {
+              setState(() {
+                _frameSecond = value;
+              });
+            },
+          ),
+          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -212,77 +223,163 @@ class _VideoProbePageState extends State<VideoProbePage> {
           ),
           const SizedBox(height: 20),
           if (backendInfo != null) ...[
-            _InfoRow(label: 'FFmpeg', value: backendInfo.ffmpegVersion),
-            _InfoRow(label: 'FFmpeg license', value: backendInfo.license),
-            _InfoRow(
-              label: 'Input formats',
-              value: backendInfo.supportedInputFormats.join(', '),
+            const _SectionTitle('Backend'),
+            _InfoPanel(
+              rows: [
+                ('FFmpeg', backendInfo.ffmpegVersion),
+                ('License', backendInfo.license),
+                ('Input formats', backendInfo.supportedInputFormats.join(', ')),
+                (
+                  'Video decoders',
+                  backendInfo.supportedVideoDecoders.join(', '),
+                ),
+                (
+                  'Audio decoders',
+                  backendInfo.supportedAudioDecoders.join(', '),
+                ),
+                ('Output image', backendInfo.outputImageFormat),
+              ],
             ),
-            _InfoRow(
-              label: 'Video decoders',
-              value: backendInfo.supportedVideoDecoders.join(', '),
-            ),
-            _InfoRow(
-              label: 'Audio decoders',
-              value: backendInfo.supportedAudioDecoders.join(', '),
-            ),
-            _InfoRow(
-              label: 'Output image',
-              value: backendInfo.outputImageFormat,
-            ),
-            _InfoRow(label: 'FFmpeg config', value: backendInfo.configuration),
             const SizedBox(height: 8),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text('FFmpeg configuration'),
+              childrenPadding: const EdgeInsets.only(bottom: 12),
+              children: [SelectableText(backendInfo.configuration)],
+            ),
           ] else if (_backendMessage != null) ...[
             _InfoRow(label: 'FFmpeg backend', value: _backendMessage!),
             const SizedBox(height: 8),
           ],
           if (_message != null) Text(_message!),
-          if (_videoPath != null)
-            _InfoRow(label: 'Video path', value: _videoPath!),
+          if (_videoPath != null) ...[
+            const _SectionTitle('Input'),
+            _InfoPanel(rows: [('Video path', _videoPath!)]),
+          ],
           if (info != null) ...[
-            _InfoRow(label: 'Duration', value: info.duration.toString()),
-            _InfoRow(label: 'Size', value: '${info.width} x ${info.height}'),
-            _InfoRow(label: 'Rotation', value: '${info.rotation}'),
-            _InfoRow(label: 'Bitrate', value: '${info.bitrate ?? '-'}'),
-            _InfoRow(label: 'MIME type', value: info.mimeType),
-            _InfoRow(label: 'Format', value: info.formatName ?? '-'),
-            _InfoRow(label: 'Video codec', value: info.videoCodec ?? '-'),
-            _InfoRow(label: 'Audio codec', value: info.audioCodec ?? '-'),
-            _InfoRow(
-              label: 'File size',
-              value: info.fileSizeBytes == null
-                  ? '-'
-                  : '${info.fileSizeBytes} bytes',
+            const _SectionTitle('Video info'),
+            _InfoPanel(
+              rows: [
+                ('Duration', info.duration.toString()),
+                ('Size', '${info.width} x ${info.height}'),
+                ('Rotation', '${info.rotation}'),
+                ('Bitrate', '${info.bitrate ?? '-'}'),
+                ('MIME type', info.mimeType),
+                ('Format', info.formatName ?? '-'),
+                ('Video codec', info.videoCodec ?? '-'),
+                ('Audio codec', info.audioCodec ?? '-'),
+                (
+                  'File size',
+                  info.fileSizeBytes == null
+                      ? '-'
+                      : '${info.fileSizeBytes} bytes',
+                ),
+              ],
             ),
           ],
           if (_cover != null) ...[
             _CoverPreview(title: 'Cover', image: _cover!),
             const SizedBox(height: 16),
-            _InfoRow(label: 'Cover path', value: _cover!.path),
-            _InfoRow(
-              label: 'Cover size',
-              value: '${_cover!.width} x ${_cover!.height}',
-            ),
-            _InfoRow(
-              label: 'Cover time',
-              value: _cover!.actualTime?.toString() ?? '-',
-            ),
+            _ImageInfoPanel(label: 'Cover', image: _cover!),
           ],
           if (_frame != null) ...[
             _CoverPreview(title: 'Frame', image: _frame!),
             const SizedBox(height: 16),
-            _InfoRow(label: 'Frame path', value: _frame!.path),
-            _InfoRow(
-              label: 'Frame size',
-              value: '${_frame!.width} x ${_frame!.height}',
-            ),
-            _InfoRow(
-              label: 'Frame time',
-              value: _frame!.actualTime?.toString() ?? '-',
-            ),
+            _ImageInfoPanel(label: 'Frame', image: _frame!),
           ],
         ],
       ),
+    );
+  }
+}
+
+class _FrameTimeControl extends StatelessWidget {
+  const _FrameTimeControl({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final double value;
+  final bool enabled;
+  final ValueChanged<double> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Frame time: ${value.toStringAsFixed(1)}s',
+          style: Theme.of(context).textTheme.labelLarge,
+        ),
+        Slider(
+          value: value,
+          min: 0,
+          max: 30,
+          divisions: 60,
+          label: '${value.toStringAsFixed(1)}s',
+          onChanged: enabled ? onChanged : null,
+        ),
+      ],
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Text(text, style: Theme.of(context).textTheme.titleMedium),
+    );
+  }
+}
+
+class _InfoPanel extends StatelessWidget {
+  const _InfoPanel({required this.rows});
+
+  final List<(String, String)> rows;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            for (final row in rows)
+              _InfoRow(label: row.$1, value: row.$2.isEmpty ? '-' : row.$2),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ImageInfoPanel extends StatelessWidget {
+  const _ImageInfoPanel({required this.label, required this.image});
+
+  final String label;
+  final CoverImage image;
+
+  @override
+  Widget build(BuildContext context) {
+    return _InfoPanel(
+      rows: [
+        ('$label path', image.path),
+        ('$label size', '${image.width} x ${image.height}'),
+        ('$label requested', image.requestedTime.toString()),
+        ('$label decoded', image.actualTime?.toString() ?? '-'),
+      ],
     );
   }
 }

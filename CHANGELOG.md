@@ -1,3 +1,11 @@
+## 0.1.1
+
+* Expanded README examples for metadata reading, backend diagnostics, cover
+  extraction, frame extraction, cache cleanup, and error handling.
+* Improved the example app layout with clearer action controls, generated image
+  summaries, backend capability summaries, and configurable frame extraction
+  time.
+
 ## 0.1.0
 
 * Added structured `CoverImage` results through `generateCoverImage`.
