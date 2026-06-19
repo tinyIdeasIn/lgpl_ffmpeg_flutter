@@ -1,3 +1,10 @@
+## 0.0.4
+
+* Added `backendInfo` for inspecting bundled FFmpeg version, configuration, and
+  license details at runtime.
+* Expanded `VideoInfo` with optional format, codec, and file size metadata.
+* Updated the example app to display the new metadata and backend diagnostics.
+
 ## 0.0.3
 
 * Fixed pub.dev package scoring items by documenting the current release in the

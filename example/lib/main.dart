@@ -32,9 +32,37 @@ class VideoProbePage extends StatefulWidget {
 class _VideoProbePageState extends State<VideoProbePage> {
   String? _videoPath;
   VideoInfo? _info;
+  FfmpegBackendInfo? _backendInfo;
   String? _coverPath;
   String? _message;
+  String? _backendMessage;
   bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBackendInfo();
+  }
+
+  Future<void> _loadBackendInfo() async {
+    try {
+      final info = await LgplFfmpegFlutter.backendInfo();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _backendInfo = info;
+        _backendMessage = null;
+      });
+    } on VideoProcessException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _backendMessage = '${error.code.name}: ${error.message}';
+      });
+    }
+  }
 
   Future<void> _pickAndProcessVideo() async {
     setState(() {
@@ -89,6 +117,7 @@ class _VideoProbePageState extends State<VideoProbePage> {
   @override
   Widget build(BuildContext context) {
     final info = _info;
+    final backendInfo = _backendInfo;
     return Scaffold(
       appBar: AppBar(title: const Text('lgpl_ffmpeg_flutter')),
       body: ListView(
@@ -105,6 +134,15 @@ class _VideoProbePageState extends State<VideoProbePage> {
             label: Text(_loading ? 'Processing...' : 'Pick video'),
           ),
           const SizedBox(height: 20),
+          if (backendInfo != null) ...[
+            _InfoRow(label: 'FFmpeg', value: backendInfo.ffmpegVersion),
+            _InfoRow(label: 'FFmpeg license', value: backendInfo.license),
+            _InfoRow(label: 'FFmpeg config', value: backendInfo.configuration),
+            const SizedBox(height: 8),
+          ] else if (_backendMessage != null) ...[
+            _InfoRow(label: 'FFmpeg backend', value: _backendMessage!),
+            const SizedBox(height: 8),
+          ],
           if (_message != null) Text(_message!),
           if (_videoPath != null)
             _InfoRow(label: 'Video path', value: _videoPath!),
@@ -114,6 +152,15 @@ class _VideoProbePageState extends State<VideoProbePage> {
             _InfoRow(label: 'Rotation', value: '${info.rotation}'),
             _InfoRow(label: 'Bitrate', value: '${info.bitrate ?? '-'}'),
             _InfoRow(label: 'MIME type', value: info.mimeType),
+            _InfoRow(label: 'Format', value: info.formatName ?? '-'),
+            _InfoRow(label: 'Video codec', value: info.videoCodec ?? '-'),
+            _InfoRow(label: 'Audio codec', value: info.audioCodec ?? '-'),
+            _InfoRow(
+              label: 'File size',
+              value: info.fileSizeBytes == null
+                  ? '-'
+                  : '${info.fileSizeBytes} bytes',
+            ),
           ],
           if (_coverPath != null) ...[
             _CoverPreview(coverPath: _coverPath!),

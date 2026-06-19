@@ -32,6 +32,7 @@ flutter pub add lgpl_ffmpeg_flutter
 import 'package:lgpl_ffmpeg_flutter/lgpl_ffmpeg_flutter.dart';
 
 final info = await LgplFfmpegFlutter.readInfo(videoPath: video.path);
+final backend = await LgplFfmpegFlutter.backendInfo();
 
 final cover = await LgplFfmpegFlutter.generateCover(
   videoPath: video.path,
@@ -41,6 +42,8 @@ final cover = await LgplFfmpegFlutter.generateCover(
 );
 
 print(info.duration);
+print(info.videoCodec);
+print(backend.license);
 print(cover);
 ```
 
@@ -51,6 +54,18 @@ print(cover);
 - `rotation`: display rotation in degrees, defaulting to `0`.
 - `bitrate`: stream bitrate when available.
 - `mimeType`: container or video MIME type when available.
+- `formatName`: FFmpeg container format name when available.
+- `videoCodec`: FFmpeg video codec name when available.
+- `audioCodec`: FFmpeg audio codec name when available.
+- `fileSizeBytes`: local file size when available.
+
+`backendInfo` returns runtime diagnostics from the bundled FFmpeg libraries:
+
+- `ffmpegVersion`: FFmpeg version string compiled into libavutil.
+- `avformatVersion`, `avcodecVersion`, and `avutilVersion`: linked library
+  versions.
+- `configuration`: FFmpeg configure arguments compiled into the libraries.
+- `license`: FFmpeg license string reported by libavformat.
 
 `generateCover` writes a `.png` image file in the platform cache directory.
 
