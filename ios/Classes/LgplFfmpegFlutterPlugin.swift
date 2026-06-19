@@ -13,6 +13,8 @@ public class LgplFfmpegFlutterPlugin: NSObject, FlutterPlugin {
     switch call.method {
     case "readInfo":
       handleReadInfo(call, result: result)
+    case "backendInfo":
+      result(mapResult(from: lgpl_ffmpeg_flutter_backend_info()))
     case "generateCover":
       handleGenerateCover(call, result: result)
     default:

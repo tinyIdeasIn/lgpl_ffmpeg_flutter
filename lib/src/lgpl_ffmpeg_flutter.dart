@@ -1,3 +1,4 @@
+import 'ffmpeg_backend_info.dart';
 import 'lgpl_ffmpeg_flutter_platform.dart';
 import 'video_info.dart';
 
@@ -11,6 +12,11 @@ class LgplFfmpegFlutter {
   /// inspect the file.
   static Future<VideoInfo> readInfo({required String videoPath}) {
     return LgplFfmpegFlutterPlatform.instance.readInfo(videoPath: videoPath);
+  }
+
+  /// Reads runtime diagnostics from the bundled LGPL FFmpeg backend.
+  static Future<FfmpegBackendInfo> backendInfo() {
+    return LgplFfmpegFlutterPlatform.instance.backendInfo();
   }
 
   /// Extracts a cover image from the video file at [videoPath].

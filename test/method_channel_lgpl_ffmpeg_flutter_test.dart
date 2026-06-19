@@ -24,6 +24,15 @@ void main() {
                 'bitrate': 3000000,
                 'mimeType': 'video/mp4',
               };
+            case 'backendInfo':
+              return <String, Object?>{
+                'ffmpegVersion': '8.0.1',
+                'avformatVersion': '62.3.100',
+                'avcodecVersion': '62.11.100',
+                'avutilVersion': '60.8.100',
+                'configuration': '--disable-gpl --disable-nonfree',
+                'license': 'LGPL version 2.1 or later',
+              };
             case 'generateCover':
               return <String, Object?>{
                 'coverPath': '/tmp/lgpl_ffmpeg_cover.png',
@@ -67,6 +76,15 @@ void main() {
       'maxLongEdge': 1280,
       'quality': 90,
     });
+  });
+
+  test('backendInfo sends the controlled diagnostic method', () async {
+    final info = await platform.backendInfo();
+
+    expect(info.ffmpegVersion, '8.0.1');
+    expect(info.license, contains('LGPL'));
+    expect(calls.single.method, 'backendInfo');
+    expect(calls.single.arguments, isNull);
   });
 
   test('platform exceptions are mapped to VideoProcessException', () async {

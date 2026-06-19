@@ -4,6 +4,7 @@
 #include <libavformat/avformat.h>
 #include <libavutil/dict.h>
 #include <libavutil/display.h>
+#include <libavutil/ffversion.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/opt.h>
 #include <libswscale/swscale.h>
@@ -29,6 +30,58 @@ static char* error_json(const char* code, const char* message) {
   snprintf(buffer, sizeof(buffer), "{\"errorCode\":\"%s\",\"message\":\"%s\"}",
            code, message);
   return duplicate_string(buffer);
+}
+
+static char* json_escape(const char* value) {
+  size_t extra = 0;
+  for (const char* cursor = value; *cursor != '\0'; cursor++) {
+    if (*cursor == '"' || *cursor == '\\' || *cursor == '\n' ||
+        *cursor == '\r' || *cursor == '\t') {
+      extra++;
+    }
+  }
+
+  size_t length = strlen(value);
+  char* escaped = (char*)malloc(length + extra + 1);
+  if (escaped == NULL) {
+    return NULL;
+  }
+
+  char* out = escaped;
+  for (const char* cursor = value; *cursor != '\0'; cursor++) {
+    switch (*cursor) {
+      case '"':
+        *out++ = '\\';
+        *out++ = '"';
+        break;
+      case '\\':
+        *out++ = '\\';
+        *out++ = '\\';
+        break;
+      case '\n':
+        *out++ = '\\';
+        *out++ = 'n';
+        break;
+      case '\r':
+        *out++ = '\\';
+        *out++ = 'r';
+        break;
+      case '\t':
+        *out++ = '\\';
+        *out++ = 't';
+        break;
+      default:
+        *out++ = *cursor;
+        break;
+    }
+  }
+  *out = '\0';
+  return escaped;
+}
+
+static void version_string(unsigned version, char* buffer, size_t buffer_size) {
+  snprintf(buffer, buffer_size, "%d.%d.%d", AV_VERSION_MAJOR(version),
+           AV_VERSION_MINOR(version), AV_VERSION_MICRO(version));
 }
 
 static long long duration_ms(const AVFormatContext* format_context) {
@@ -139,6 +192,44 @@ char* lgpl_ffmpeg_flutter_read_info(const char* video_path) {
   }
   avformat_close_input(&format_context);
   return duplicate_string(buffer);
+}
+
+char* lgpl_ffmpeg_flutter_backend_info(void) {
+  char avformat_version_text[32];
+  char avcodec_version_text[32];
+  char avutil_version_text[32];
+  version_string(avformat_version(), avformat_version_text,
+                 sizeof(avformat_version_text));
+  version_string(avcodec_version(), avcodec_version_text,
+                 sizeof(avcodec_version_text));
+  version_string(avutil_version(), avutil_version_text,
+                 sizeof(avutil_version_text));
+
+  const char* configuration = avformat_configuration();
+  const char* license = avformat_license();
+  char* escaped_configuration = json_escape(configuration);
+  char* escaped_license = json_escape(license);
+  if (escaped_configuration == NULL || escaped_license == NULL) {
+    free(escaped_configuration);
+    free(escaped_license);
+    return NULL;
+  }
+  size_t capacity = strlen(escaped_configuration) + strlen(escaped_license) + 512;
+  char* result = (char*)malloc(capacity);
+  if (result == NULL) {
+    free(escaped_configuration);
+    free(escaped_license);
+    return NULL;
+  }
+  snprintf(result, capacity,
+           "{\"ffmpegVersion\":\"%s\",\"avformatVersion\":\"%s\","
+           "\"avcodecVersion\":\"%s\",\"avutilVersion\":\"%s\","
+           "\"configuration\":\"%s\",\"license\":\"%s\"}",
+           FFMPEG_VERSION, avformat_version_text, avcodec_version_text,
+           avutil_version_text, escaped_configuration, escaped_license);
+  free(escaped_configuration);
+  free(escaped_license);
+  return result;
 }
 
 static int decode_frame_at(AVFormatContext* format_context,

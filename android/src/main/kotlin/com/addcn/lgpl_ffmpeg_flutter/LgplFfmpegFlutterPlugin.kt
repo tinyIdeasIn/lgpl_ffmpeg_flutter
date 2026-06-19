@@ -27,6 +27,7 @@ class LgplFfmpegFlutterPlugin :
     ) {
         when (call.method) {
             "readInfo" -> handleReadInfo(call, result)
+            "backendInfo" -> handleBackendInfo(result)
             "generateCover" -> handleGenerateCover(call, result)
             else -> result.notImplemented()
         }
@@ -81,6 +82,10 @@ class LgplFfmpegFlutterPlugin :
         runBackend(result) { nativeReadInfo(videoPath) }
     }
 
+    private fun handleBackendInfo(result: Result) {
+        runBackend(result) { nativeBackendInfo() }
+    }
+
     private fun runBackend(
         result: Result,
         block: () -> String
@@ -124,6 +129,8 @@ class LgplFfmpegFlutterPlugin :
     }
 
     private external fun nativeReadInfo(videoPath: String): String
+
+    private external fun nativeBackendInfo(): String
 
     private external fun nativeGenerateCover(
         videoPath: String,

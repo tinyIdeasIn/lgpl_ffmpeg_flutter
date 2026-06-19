@@ -2,6 +2,7 @@
 #define LGPL_FFMPEG_FLUTTER_BACKEND_H_
 
 const char* lgpl_ffmpeg_flutter_backend_status(void);
+char* lgpl_ffmpeg_flutter_backend_info(void);
 char* lgpl_ffmpeg_flutter_read_info(const char* video_path);
 char* lgpl_ffmpeg_flutter_generate_cover(
     const char* video_path,

@@ -3,6 +3,7 @@
 library;
 
 export 'src/lgpl_ffmpeg_flutter.dart';
+export 'src/ffmpeg_backend_info.dart';
 export 'src/method_channel_lgpl_ffmpeg_flutter.dart'
     show MethodChannelLgplFfmpegFlutter;
 export 'src/video_info.dart';

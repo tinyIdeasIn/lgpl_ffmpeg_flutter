@@ -1,5 +1,6 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'ffmpeg_backend_info.dart';
 import 'method_channel_lgpl_ffmpeg_flutter.dart';
 import 'video_info.dart';
 
@@ -24,6 +25,11 @@ abstract class LgplFfmpegFlutterPlatform extends PlatformInterface {
   /// Reads video metadata from [videoPath].
   Future<VideoInfo> readInfo({required String videoPath}) {
     throw UnimplementedError('readInfo() has not been implemented.');
+  }
+
+  /// Reads runtime diagnostics from the native FFmpeg backend.
+  Future<FfmpegBackendInfo> backendInfo() {
+    throw UnimplementedError('backendInfo() has not been implemented.');
   }
 
   /// Generates a cover image for [videoPath].

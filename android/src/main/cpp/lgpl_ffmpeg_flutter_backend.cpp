@@ -15,6 +15,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/dict.h>
 #include <libavutil/display.h>
+#include <libavutil/ffversion.h>
 #include <libavutil/imgutils.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
@@ -52,6 +53,13 @@ std::string EscapeJson(const std::string& value) {
 std::string ErrorJson(const char* code, const std::string& message) {
   return std::string("{\"errorCode\":\"") + code + "\",\"message\":\"" +
          EscapeJson(message) + "\"}";
+}
+
+std::string VersionString(unsigned version) {
+  std::ostringstream out;
+  out << AV_VERSION_MAJOR(version) << "." << AV_VERSION_MINOR(version) << "."
+      << AV_VERSION_MICRO(version);
+  return out.str();
 }
 
 std::string JStringToString(JNIEnv* env, jstring value) {
@@ -180,6 +188,23 @@ std::string ReadInfo(const std::string& path) {
   json << "}";
 
   avformat_close_input(&format_context);
+  return json.str();
+}
+
+std::string BackendInfo() {
+  std::ostringstream json;
+  json << "{";
+  json << "\"ffmpegVersion\":\"" << EscapeJson(FFMPEG_VERSION) << "\",";
+  json << "\"avformatVersion\":\""
+       << EscapeJson(VersionString(avformat_version())) << "\",";
+  json << "\"avcodecVersion\":\""
+       << EscapeJson(VersionString(avcodec_version())) << "\",";
+  json << "\"avutilVersion\":\"" << EscapeJson(VersionString(avutil_version()))
+       << "\",";
+  json << "\"configuration\":\""
+       << EscapeJson(avformat_configuration()) << "\",";
+  json << "\"license\":\"" << EscapeJson(avformat_license()) << "\"";
+  json << "}";
   return json.str();
 }
 
@@ -464,6 +489,14 @@ Java_com_addcn_lgpl_1ffmpeg_1flutter_LgplFfmpegFlutterPlugin_nativeReadInfo(
     jobject,
     jstring video_path) {
   const std::string result = ReadInfo(JStringToString(env, video_path));
+  return env->NewStringUTF(result.c_str());
+}
+
+extern "C" JNIEXPORT jstring JNICALL
+Java_com_addcn_lgpl_1ffmpeg_1flutter_LgplFfmpegFlutterPlugin_nativeBackendInfo(
+    JNIEnv* env,
+    jobject) {
+  const std::string result = BackendInfo();
   return env->NewStringUTF(result.c_str());
 }
 

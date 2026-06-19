@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'ffmpeg_backend_info.dart';
 import 'lgpl_ffmpeg_flutter_platform.dart';
 import 'video_info.dart';
 import 'video_process_error.dart';
@@ -24,6 +25,21 @@ class MethodChannelLgplFfmpegFlutter extends LgplFfmpegFlutterPlatform {
         throw const FormatException('readInfo returned null.');
       }
       return VideoInfo.fromMap(result);
+    } on PlatformException catch (exception) {
+      throw VideoProcessException.fromPlatformException(exception);
+    }
+  }
+
+  @override
+  Future<FfmpegBackendInfo> backendInfo() async {
+    try {
+      final result = await methodChannel.invokeMapMethod<Object?, Object?>(
+        'backendInfo',
+      );
+      if (result == null) {
+        throw const FormatException('backendInfo returned null.');
+      }
+      return FfmpegBackendInfo.fromMap(result);
     } on PlatformException catch (exception) {
       throw VideoProcessException.fromPlatformException(exception);
     }

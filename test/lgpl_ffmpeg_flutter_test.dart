@@ -7,6 +7,18 @@ class FakeLgplFfmpegFlutterPlatform
     with MockPlatformInterfaceMixin
     implements LgplFfmpegFlutterPlatform {
   @override
+  Future<FfmpegBackendInfo> backendInfo() async {
+    return const FfmpegBackendInfo(
+      ffmpegVersion: '8.0.1',
+      avformatVersion: '62.3.100',
+      avcodecVersion: '62.11.100',
+      avutilVersion: '60.8.100',
+      configuration: '--disable-gpl --disable-nonfree --enable-shared',
+      license: 'LGPL version 2.1 or later',
+    );
+  }
+
+  @override
   Future<VideoInfo> readInfo({required String videoPath}) async {
     return const VideoInfo(
       duration: Duration(milliseconds: 12345),
@@ -51,6 +63,16 @@ void main() {
     expect(info.mimeType, 'video/mp4');
   });
 
+  test('public API delegates backendInfo to platform implementation', () async {
+    LgplFfmpegFlutterPlatform.instance = FakeLgplFfmpegFlutterPlatform();
+
+    final info = await LgplFfmpegFlutter.backendInfo();
+
+    expect(info.ffmpegVersion, '8.0.1');
+    expect(info.configuration, contains('--disable-gpl'));
+    expect(info.license, contains('LGPL'));
+  });
+
   test('public API returns generated png cover path', () async {
     LgplFfmpegFlutterPlatform.instance = FakeLgplFfmpegFlutterPlatform();
 
@@ -91,5 +113,23 @@ void main() {
     expect(exception.code, VideoProcessErrorCode.openFailed);
     expect(exception.message, 'Cannot open video.');
     expect(exception.details, isA<Map<String, Object?>>());
+  });
+
+  test('FfmpegBackendInfo parses method channel map', () {
+    final info = FfmpegBackendInfo.fromMap(<Object?, Object?>{
+      'ffmpegVersion': '8.0.1',
+      'avformatVersion': '62.3.100',
+      'avcodecVersion': '62.11.100',
+      'avutilVersion': '60.8.100',
+      'configuration': '--disable-gpl --disable-nonfree',
+      'license': 'LGPL version 2.1 or later',
+    });
+
+    expect(info.ffmpegVersion, '8.0.1');
+    expect(info.avformatVersion, '62.3.100');
+    expect(info.avcodecVersion, '62.11.100');
+    expect(info.avutilVersion, '60.8.100');
+    expect(info.configuration, contains('--disable-nonfree'));
+    expect(info.license, contains('LGPL'));
   });
 }
