@@ -282,6 +282,15 @@ bool DecodeFrameAt(AVFormatContext* format_context,
   return decoded;
 }
 
+int64_t FrameTimeMs(const AVFrame* frame, const AVStream* stream) {
+  if (frame == nullptr || stream == nullptr ||
+      frame->best_effort_timestamp == AV_NOPTS_VALUE) {
+    return -1;
+  }
+  return av_rescale_q(frame->best_effort_timestamp, stream->time_base,
+                      AVRational{1, 1000});
+}
+
 bool WritePngFile(const std::string& output_path, const AVFrame* rgb_frame) {
   const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_PNG);
   if (codec == nullptr) {
@@ -433,9 +442,11 @@ std::string GenerateCover(const std::string& path,
 
   AVFrame* decoded_frame = av_frame_alloc();
   bool decoded = false;
+  int64_t requested_time_ms = 0;
   for (int64_t candidate : candidates) {
+    requested_time_ms = std::max<int64_t>(0, candidate);
     decoded = DecodeFrameAt(format_context, stream, codec_context,
-                            std::max<int64_t>(0, candidate), decoded_frame);
+                            requested_time_ms, decoded_frame);
     if (decoded) {
       break;
     }
@@ -450,6 +461,7 @@ std::string GenerateCover(const std::string& path,
 
   const int source_width = decoded_frame->width;
   const int source_height = decoded_frame->height;
+  const int64_t actual_time_ms = FrameTimeMs(decoded_frame, stream);
   const int long_edge = std::max(source_width, source_height);
   const double scale =
       long_edge > max_long_edge ? static_cast<double>(max_long_edge) / long_edge
@@ -518,8 +530,19 @@ std::string GenerateCover(const std::string& path,
   avcodec_free_context(&codec_context);
   avformat_close_input(&format_context);
 
-  return std::string("{\"coverPath\":\"") + EscapeJson(output_path.str()) +
-         "\"}";
+  std::ostringstream result;
+  result << "{\"coverPath\":\"" << EscapeJson(output_path.str()) << "\",";
+  result << "\"width\":" << cover_frame->width << ",";
+  result << "\"height\":" << cover_frame->height << ",";
+  result << "\"requestedTimeMs\":" << requested_time_ms << ",";
+  result << "\"actualTimeMs\":";
+  if (actual_time_ms >= 0) {
+    result << actual_time_ms;
+  } else {
+    result << "null";
+  }
+  result << "}";
+  return result.str();
 }
 
 }  // namespace

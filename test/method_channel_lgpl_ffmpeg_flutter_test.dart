@@ -40,6 +40,10 @@ void main() {
             case 'generateCover':
               return <String, Object?>{
                 'coverPath': '/tmp/lgpl_ffmpeg_cover.png',
+                'width': 1280,
+                'height': 720,
+                'requestedTimeMs': 300,
+                'actualTimeMs': 320,
               };
           }
           throw PlatformException(code: 'unknown');
@@ -81,6 +85,22 @@ void main() {
       'maxLongEdge': 1280,
       'quality': 90,
     });
+  });
+
+  test('generateCoverImage parses structured cover result', () async {
+    final cover = await platform.generateCoverImage(
+      videoPath: '/tmp/video.mp4',
+      preferredTimes: const [Duration(milliseconds: 300)],
+      maxLongEdge: 1280,
+      quality: 90,
+    );
+
+    expect(cover?.path, '/tmp/lgpl_ffmpeg_cover.png');
+    expect(cover?.width, 1280);
+    expect(cover?.height, 720);
+    expect(cover?.requestedTime, const Duration(milliseconds: 300));
+    expect(cover?.actualTime, const Duration(milliseconds: 320));
+    expect(calls.single.method, 'generateCover');
   });
 
   test('backendInfo sends the controlled diagnostic method', () async {

@@ -303,6 +303,15 @@ static int decode_frame_at(AVFormatContext* format_context,
   return decoded;
 }
 
+static long long frame_time_ms(const AVFrame* frame, const AVStream* stream) {
+  if (frame == NULL || stream == NULL ||
+      frame->best_effort_timestamp == AV_NOPTS_VALUE) {
+    return -1;
+  }
+  return av_rescale_q(frame->best_effort_timestamp, stream->time_base,
+                      (AVRational){1, 1000});
+}
+
 static int write_png_file(const char* output_path, const AVFrame* rgb_frame) {
   const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_PNG);
   if (codec == NULL) {
@@ -457,10 +466,12 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
 
   AVFrame* decoded_frame = av_frame_alloc();
   int decoded = 0;
+  long long requested_time_ms = 0;
   for (int i = 0; i < candidate_count; i++) {
-    long long candidate = candidates[i] < 0 ? 0 : candidates[i];
+    requested_time_ms = candidates[i] < 0 ? 0 : candidates[i];
     decoded =
-        decode_frame_at(format_context, stream, codec_context, candidate, decoded_frame);
+        decode_frame_at(format_context, stream, codec_context, requested_time_ms,
+                        decoded_frame);
     if (decoded) {
       break;
     }
@@ -475,6 +486,7 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
 
   int source_width = decoded_frame->width;
   int source_height = decoded_frame->height;
+  long long actual_time_ms = frame_time_ms(decoded_frame, stream);
   int long_edge = source_width > source_height ? source_width : source_height;
   double scale = long_edge > max_long_edge ? (double)max_long_edge / long_edge : 1.0;
   int out_width = source_width * scale;
@@ -544,7 +556,19 @@ char* lgpl_ffmpeg_flutter_generate_cover(const char* video_path,
   avformat_close_input(&format_context);
 
   char result[1200];
-  snprintf(result, sizeof(result), "{\"coverPath\":\"%s\"}", output_path);
+  if (actual_time_ms >= 0) {
+    snprintf(result, sizeof(result),
+             "{\"coverPath\":\"%s\",\"width\":%d,\"height\":%d,"
+             "\"requestedTimeMs\":%lld,\"actualTimeMs\":%lld}",
+             output_path, cover_frame->width, cover_frame->height,
+             requested_time_ms, actual_time_ms);
+  } else {
+    snprintf(result, sizeof(result),
+             "{\"coverPath\":\"%s\",\"width\":%d,\"height\":%d,"
+             "\"requestedTimeMs\":%lld,\"actualTimeMs\":null}",
+             output_path, cover_frame->width, cover_frame->height,
+             requested_time_ms);
+  }
   return duplicate_string(result);
 }
 

@@ -1,5 +1,6 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
+import 'cover_image.dart';
 import 'ffmpeg_backend_info.dart';
 import 'method_channel_lgpl_ffmpeg_flutter.dart';
 import 'video_info.dart';
@@ -40,5 +41,15 @@ abstract class LgplFfmpegFlutterPlatform extends PlatformInterface {
     int quality = 95,
   }) {
     throw UnimplementedError('generateCover() has not been implemented.');
+  }
+
+  /// Generates a cover image for [videoPath] and returns output metadata.
+  Future<CoverImage?> generateCoverImage({
+    required String videoPath,
+    List<Duration>? preferredTimes,
+    int maxLongEdge = 1920,
+    int quality = 95,
+  }) {
+    throw UnimplementedError('generateCoverImage() has not been implemented.');
   }
 }

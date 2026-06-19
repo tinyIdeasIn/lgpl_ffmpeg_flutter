@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'cover_image.dart';
 import 'ffmpeg_backend_info.dart';
 import 'lgpl_ffmpeg_flutter_platform.dart';
 import 'video_info.dart';
@@ -52,6 +53,22 @@ class MethodChannelLgplFfmpegFlutter extends LgplFfmpegFlutterPlatform {
     int maxLongEdge = 1920,
     int quality = 95,
   }) async {
+    final cover = await generateCoverImage(
+      videoPath: videoPath,
+      preferredTimes: preferredTimes,
+      maxLongEdge: maxLongEdge,
+      quality: quality,
+    );
+    return cover?.path;
+  }
+
+  @override
+  Future<CoverImage?> generateCoverImage({
+    required String videoPath,
+    List<Duration>? preferredTimes,
+    int maxLongEdge = 1920,
+    int quality = 95,
+  }) async {
     _validateVideoPath(videoPath);
     if (maxLongEdge <= 0) {
       throw const VideoProcessException(
@@ -76,7 +93,10 @@ class MethodChannelLgplFfmpegFlutter extends LgplFfmpegFlutterPlatform {
             'maxLongEdge': maxLongEdge,
             'quality': quality,
           });
-      return result?['coverPath'] as String?;
+      if (result == null || result['coverPath'] == null) {
+        return null;
+      }
+      return CoverImage.fromMap(result);
     } on PlatformException catch (exception) {
       throw VideoProcessException.fromPlatformException(exception);
     }

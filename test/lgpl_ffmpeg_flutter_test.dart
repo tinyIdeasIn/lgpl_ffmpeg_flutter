@@ -43,6 +43,22 @@ class FakeLgplFfmpegFlutterPlatform
   }) async {
     return '/tmp/lgpl_ffmpeg_cover.png';
   }
+
+  @override
+  Future<CoverImage?> generateCoverImage({
+    required String videoPath,
+    List<Duration>? preferredTimes,
+    int maxLongEdge = 1920,
+    int quality = 95,
+  }) async {
+    return const CoverImage(
+      path: '/tmp/lgpl_ffmpeg_cover.png',
+      width: 1280,
+      height: 720,
+      requestedTime: Duration(seconds: 1),
+      actualTime: Duration(milliseconds: 960),
+    );
+  }
 }
 
 void main() {
@@ -89,6 +105,36 @@ void main() {
     );
 
     expect(cover, endsWith('.png'));
+  });
+
+  test('public API returns structured generated cover image', () async {
+    LgplFfmpegFlutterPlatform.instance = FakeLgplFfmpegFlutterPlatform();
+
+    final cover = await LgplFfmpegFlutter.generateCoverImage(
+      videoPath: '/tmp/video.mp4',
+    );
+
+    expect(cover?.path, endsWith('.png'));
+    expect(cover?.width, 1280);
+    expect(cover?.height, 720);
+    expect(cover?.requestedTime, const Duration(seconds: 1));
+    expect(cover?.actualTime, const Duration(milliseconds: 960));
+  });
+
+  test('CoverImage parses method channel map', () {
+    final cover = CoverImage.fromMap(<Object?, Object?>{
+      'coverPath': '/tmp/lgpl_ffmpeg_cover.png',
+      'width': 640,
+      'height': 360,
+      'requestedTimeMs': 1000,
+      'actualTimeMs': 960,
+    });
+
+    expect(cover.path, '/tmp/lgpl_ffmpeg_cover.png');
+    expect(cover.width, 640);
+    expect(cover.height, 360);
+    expect(cover.requestedTime, const Duration(seconds: 1));
+    expect(cover.actualTime, const Duration(milliseconds: 960));
   });
 
   test('VideoInfo parses method channel map', () {

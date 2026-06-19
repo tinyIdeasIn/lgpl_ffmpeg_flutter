@@ -1,3 +1,4 @@
+import 'cover_image.dart';
 import 'ffmpeg_backend_info.dart';
 import 'lgpl_ffmpeg_flutter_platform.dart';
 import 'video_info.dart';
@@ -33,6 +34,21 @@ class LgplFfmpegFlutter {
     int quality = 95,
   }) {
     return LgplFfmpegFlutterPlatform.instance.generateCover(
+      videoPath: videoPath,
+      preferredTimes: preferredTimes,
+      maxLongEdge: maxLongEdge,
+      quality: quality,
+    );
+  }
+
+  /// Extracts a cover image and returns metadata for the generated PNG.
+  static Future<CoverImage?> generateCoverImage({
+    required String videoPath,
+    List<Duration>? preferredTimes,
+    int maxLongEdge = 1920,
+    int quality = 95,
+  }) {
+    return LgplFfmpegFlutterPlatform.instance.generateCoverImage(
       videoPath: videoPath,
       preferredTimes: preferredTimes,
       maxLongEdge: maxLongEdge,
