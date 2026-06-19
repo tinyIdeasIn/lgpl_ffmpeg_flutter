@@ -15,6 +15,10 @@ class FakeLgplFfmpegFlutterPlatform
       avutilVersion: '60.8.100',
       configuration: '--disable-gpl --disable-nonfree --enable-shared',
       license: 'LGPL version 2.1 or later',
+      supportedInputFormats: <String>['mov', 'matroska'],
+      supportedVideoDecoders: <String>['h264', 'hevc'],
+      supportedAudioDecoders: <String>['aac'],
+      outputImageFormat: 'png',
     );
   }
 
@@ -116,6 +120,10 @@ void main() {
     expect(info.ffmpegVersion, '8.0.1');
     expect(info.configuration, contains('--disable-gpl'));
     expect(info.license, contains('LGPL'));
+    expect(info.supportedInputFormats, contains('mov'));
+    expect(info.supportedVideoDecoders, contains('h264'));
+    expect(info.supportedAudioDecoders, contains('aac'));
+    expect(info.outputImageFormat, 'png');
   });
 
   test('public API returns generated png cover path', () async {
@@ -241,6 +249,10 @@ void main() {
       'avutilVersion': '60.8.100',
       'configuration': '--disable-gpl --disable-nonfree',
       'license': 'LGPL version 2.1 or later',
+      'supportedInputFormats': <String>['mov', 'matroska'],
+      'supportedVideoDecoders': <String>['h264', 'hevc'],
+      'supportedAudioDecoders': <String>['aac'],
+      'outputImageFormat': 'png',
     });
 
     expect(info.ffmpegVersion, '8.0.1');
@@ -249,5 +261,20 @@ void main() {
     expect(info.avutilVersion, '60.8.100');
     expect(info.configuration, contains('--disable-nonfree'));
     expect(info.license, contains('LGPL'));
+    expect(info.supportedInputFormats, contains('mov'));
+    expect(info.supportedVideoDecoders, contains('h264'));
+    expect(info.supportedAudioDecoders, contains('aac'));
+    expect(info.outputImageFormat, 'png');
+  });
+
+  test('FfmpegBackendInfo keeps capability fields optional', () {
+    final info = FfmpegBackendInfo.fromMap(<Object?, Object?>{
+      'ffmpegVersion': '8.0.1',
+    });
+
+    expect(info.supportedInputFormats, isEmpty);
+    expect(info.supportedVideoDecoders, isEmpty);
+    expect(info.supportedAudioDecoders, isEmpty);
+    expect(info.outputImageFormat, 'png');
   });
 }

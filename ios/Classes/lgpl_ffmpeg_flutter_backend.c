@@ -268,7 +268,13 @@ char* lgpl_ffmpeg_flutter_backend_info(void) {
   snprintf(result, capacity,
            "{\"ffmpegVersion\":\"%s\",\"avformatVersion\":\"%s\","
            "\"avcodecVersion\":\"%s\",\"avutilVersion\":\"%s\","
-           "\"configuration\":\"%s\",\"license\":\"%s\"}",
+           "\"configuration\":\"%s\",\"license\":\"%s\","
+           "\"supportedInputFormats\":[\"mov\",\"matroska\","
+           "\"webm_dash_manifest\"],"
+           "\"supportedVideoDecoders\":[\"h264\",\"hevc\",\"mpeg4\","
+           "\"vp8\",\"vp9\"],"
+           "\"supportedAudioDecoders\":[\"aac\"],"
+           "\"outputImageFormat\":\"png\"}",
            FFMPEG_VERSION, avformat_version_text, avcodec_version_text,
            avutil_version_text, escaped_configuration, escaped_license);
   free(escaped_configuration);

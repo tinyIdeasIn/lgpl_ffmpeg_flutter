@@ -36,6 +36,10 @@ void main() {
                 'avutilVersion': '60.8.100',
                 'configuration': '--disable-gpl --disable-nonfree',
                 'license': 'LGPL version 2.1 or later',
+                'supportedInputFormats': <String>['mov', 'matroska'],
+                'supportedVideoDecoders': <String>['h264', 'hevc'],
+                'supportedAudioDecoders': <String>['aac'],
+                'outputImageFormat': 'png',
               };
             case 'generateCover':
               return <String, Object?>{
@@ -138,6 +142,9 @@ void main() {
 
     expect(info.ffmpegVersion, '8.0.1');
     expect(info.license, contains('LGPL'));
+    expect(info.supportedInputFormats, contains('mov'));
+    expect(info.supportedVideoDecoders, contains('h264'));
+    expect(info.supportedAudioDecoders, contains('aac'));
     expect(calls.single.method, 'backendInfo');
     expect(calls.single.arguments, isNull);
   });

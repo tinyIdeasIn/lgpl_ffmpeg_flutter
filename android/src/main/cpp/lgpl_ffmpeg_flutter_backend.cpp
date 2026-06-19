@@ -248,7 +248,11 @@ std::string BackendInfo() {
        << "\",";
   json << "\"configuration\":\""
        << EscapeJson(avformat_configuration()) << "\",";
-  json << "\"license\":\"" << EscapeJson(avformat_license()) << "\"";
+  json << "\"license\":\"" << EscapeJson(avformat_license()) << "\",";
+  json << "\"supportedInputFormats\":[\"mov\",\"matroska\",\"webm_dash_manifest\"],";
+  json << "\"supportedVideoDecoders\":[\"h264\",\"hevc\",\"mpeg4\",\"vp8\",\"vp9\"],";
+  json << "\"supportedAudioDecoders\":[\"aac\"],";
+  json << "\"outputImageFormat\":\"png\"";
   json << "}";
   return json.str();
 }

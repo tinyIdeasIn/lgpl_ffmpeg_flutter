@@ -8,6 +8,10 @@ class FfmpegBackendInfo {
     required this.avutilVersion,
     required this.configuration,
     required this.license,
+    this.supportedInputFormats = const <String>[],
+    this.supportedVideoDecoders = const <String>[],
+    this.supportedAudioDecoders = const <String>[],
+    this.outputImageFormat = 'png',
   });
 
   /// Converts a native method-channel result map into [FfmpegBackendInfo].
@@ -19,6 +23,10 @@ class FfmpegBackendInfo {
       avutilVersion: map['avutilVersion'] as String? ?? '',
       configuration: map['configuration'] as String? ?? '',
       license: map['license'] as String? ?? '',
+      supportedInputFormats: _stringList(map['supportedInputFormats']),
+      supportedVideoDecoders: _stringList(map['supportedVideoDecoders']),
+      supportedAudioDecoders: _stringList(map['supportedAudioDecoders']),
+      outputImageFormat: map['outputImageFormat'] as String? ?? 'png',
     );
   }
 
@@ -39,4 +47,23 @@ class FfmpegBackendInfo {
 
   /// FFmpeg license string reported by libavformat.
   final String license;
+
+  /// Input container formats enabled in the bundled build.
+  final List<String> supportedInputFormats;
+
+  /// Video decoders enabled in the bundled build.
+  final List<String> supportedVideoDecoders;
+
+  /// Audio decoders enabled in the bundled build.
+  final List<String> supportedAudioDecoders;
+
+  /// Generated image format.
+  final String outputImageFormat;
+
+  static List<String> _stringList(Object? value) {
+    if (value is! List) {
+      return const <String>[];
+    }
+    return value.whereType<String>().toList(growable: false);
+  }
 }

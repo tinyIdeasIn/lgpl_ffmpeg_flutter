@@ -1,6 +1,7 @@
 package com.addcn.lgpl_ffmpeg_flutter
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -177,9 +178,25 @@ class LgplFfmpegFlutterPlugin :
         val keys = json.keys()
         while (keys.hasNext()) {
             val key = keys.next()
-            map[key] = if (json.isNull(key)) null else json.get(key)
+            map[key] = if (json.isNull(key)) null else jsonValue(json.get(key))
         }
         return map
+    }
+
+    private fun jsonArrayToList(json: JSONArray): List<Any?> {
+        val list = mutableListOf<Any?>()
+        for (index in 0 until json.length()) {
+            list.add(if (json.isNull(index)) null else jsonValue(json.get(index)))
+        }
+        return list
+    }
+
+    private fun jsonValue(value: Any): Any? {
+        return when (value) {
+            is JSONObject -> jsonToMap(value)
+            is JSONArray -> jsonArrayToList(value)
+            else -> value
+        }
     }
 
     private external fun nativeReadInfo(videoPath: String): String
