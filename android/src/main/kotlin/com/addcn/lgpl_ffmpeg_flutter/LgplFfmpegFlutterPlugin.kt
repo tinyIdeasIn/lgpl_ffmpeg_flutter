@@ -30,6 +30,7 @@ class LgplFfmpegFlutterPlugin :
             "backendInfo" -> handleBackendInfo(result)
             "generateCover" -> handleGenerateCover(call, result)
             "extractFrame" -> handleExtractFrame(call, result)
+            "deleteGeneratedFiles" -> handleDeleteGeneratedFiles(result)
             else -> result.notImplemented()
         }
     }
@@ -118,6 +119,25 @@ class LgplFfmpegFlutterPlugin :
 
     private fun handleBackendInfo(result: Result) {
         runBackend(result) { nativeBackendInfo() }
+    }
+
+    private fun handleDeleteGeneratedFiles(result: Result) {
+        try {
+            val count = applicationContext.cacheDir
+                .listFiles { file ->
+                    file.isFile &&
+                        file.name.startsWith("lgpl_ffmpeg_") &&
+                        file.name.endsWith(".png")
+                }
+                ?.count { it.delete() } ?: 0
+            result.success(count)
+        } catch (exception: Throwable) {
+            result.error(
+                "outputFailed",
+                exception.message ?: "Could not delete generated files.",
+                null
+            )
+        }
     }
 
     private fun runBackend(

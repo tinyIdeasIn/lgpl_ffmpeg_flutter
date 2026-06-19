@@ -62,4 +62,11 @@ abstract class LgplFfmpegFlutterPlatform extends PlatformInterface {
   }) {
     throw UnimplementedError('extractFrame() has not been implemented.');
   }
+
+  /// Deletes generated plugin files from the platform cache.
+  Future<int> deleteGeneratedFiles() {
+    throw UnimplementedError(
+      'deleteGeneratedFiles() has not been implemented.',
+    );
+  }
 }

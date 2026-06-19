@@ -75,6 +75,11 @@ class FakeLgplFfmpegFlutterPlatform
       actualTime: const Duration(milliseconds: 2040),
     );
   }
+
+  @override
+  Future<int> deleteGeneratedFiles() async {
+    return 2;
+  }
 }
 
 void main() {
@@ -154,6 +159,14 @@ void main() {
       expect(frame?.actualTime, const Duration(milliseconds: 2040));
     },
   );
+
+  test('public API delegates deleteGeneratedFiles to platform', () async {
+    LgplFfmpegFlutterPlatform.instance = FakeLgplFfmpegFlutterPlatform();
+
+    final count = await LgplFfmpegFlutter.deleteGeneratedFiles();
+
+    expect(count, 2);
+  });
 
   test('CoverImage parses method channel map', () {
     final cover = CoverImage.fromMap(<Object?, Object?>{

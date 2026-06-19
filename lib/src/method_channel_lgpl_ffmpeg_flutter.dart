@@ -140,6 +140,18 @@ class MethodChannelLgplFfmpegFlutter extends LgplFfmpegFlutterPlatform {
     }
   }
 
+  @override
+  Future<int> deleteGeneratedFiles() async {
+    try {
+      final count = await methodChannel.invokeMethod<int>(
+        'deleteGeneratedFiles',
+      );
+      return count ?? 0;
+    } on PlatformException catch (exception) {
+      throw VideoProcessException.fromPlatformException(exception);
+    }
+  }
+
   void _validateVideoPath(String videoPath) {
     if (videoPath.trim().isEmpty) {
       throw const VideoProcessException(

@@ -53,6 +53,8 @@ void main() {
                 'requestedTimeMs': 2000,
                 'actualTimeMs': 2040,
               };
+            case 'deleteGeneratedFiles':
+              return 2;
           }
           throw PlatformException(code: 'unknown');
         });
@@ -137,6 +139,14 @@ void main() {
     expect(info.ffmpegVersion, '8.0.1');
     expect(info.license, contains('LGPL'));
     expect(calls.single.method, 'backendInfo');
+    expect(calls.single.arguments, isNull);
+  });
+
+  test('deleteGeneratedFiles sends the controlled cleanup method', () async {
+    final count = await platform.deleteGeneratedFiles();
+
+    expect(count, 2);
+    expect(calls.single.method, 'deleteGeneratedFiles');
     expect(calls.single.arguments, isNull);
   });
 

@@ -19,6 +19,8 @@ public class LgplFfmpegFlutterPlugin: NSObject, FlutterPlugin {
       handleGenerateCover(call, result: result)
     case "extractFrame":
       handleExtractFrame(call, result: result)
+    case "deleteGeneratedFiles":
+      handleDeleteGeneratedFiles(result: result)
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -105,6 +107,28 @@ public class LgplFfmpegFlutterPlugin: NSObject, FlutterPlugin {
       )
     }
     result(mapResult(from: nativeResult))
+  }
+
+  private func handleDeleteGeneratedFiles(result: @escaping FlutterResult) {
+    let cacheDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)
+      .first?
+      .path ?? NSTemporaryDirectory()
+    do {
+      let fileManager = FileManager.default
+      let files = try fileManager.contentsOfDirectory(atPath: cacheDir)
+      var deletedCount = 0
+      for file in files where file.hasPrefix("lgpl_ffmpeg_") && file.hasSuffix(".png") {
+        try fileManager.removeItem(atPath: (cacheDir as NSString).appendingPathComponent(file))
+        deletedCount += 1
+      }
+      result(deletedCount)
+    } catch {
+      result(FlutterError(
+        code: "outputFailed",
+        message: error.localizedDescription,
+        details: nil
+      ))
+    }
   }
 
   private func mapResult(from nativeResult: UnsafeMutablePointer<CChar>?) -> Any {
