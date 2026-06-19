@@ -8,6 +8,10 @@ class VideoInfo {
     this.rotation = 0,
     this.bitrate,
     this.mimeType = '',
+    this.formatName,
+    this.videoCodec,
+    this.audioCodec,
+    this.fileSizeBytes,
   });
 
   /// Converts a native method-channel result map into [VideoInfo].
@@ -24,6 +28,10 @@ class VideoInfo {
       rotation: map['rotation'] as int? ?? 0,
       bitrate: map['bitrate'] as int?,
       mimeType: map['mimeType'] as String? ?? '',
+      formatName: map['formatName'] as String?,
+      videoCodec: map['videoCodec'] as String?,
+      audioCodec: map['audioCodec'] as String?,
+      fileSizeBytes: map['fileSizeBytes'] as int?,
     );
   }
 
@@ -44,4 +52,16 @@ class VideoInfo {
 
   /// Container or stream MIME type reported by the native backend.
   final String mimeType;
+
+  /// FFmpeg container format name, when available.
+  final String? formatName;
+
+  /// FFmpeg video codec name, when available.
+  final String? videoCodec;
+
+  /// FFmpeg audio codec name, when available.
+  final String? audioCodec;
+
+  /// Local input file size in bytes, when available.
+  final int? fileSizeBytes;
 }

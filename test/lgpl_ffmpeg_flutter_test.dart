@@ -27,6 +27,10 @@ class FakeLgplFfmpegFlutterPlatform
       rotation: 0,
       bitrate: 3000000,
       mimeType: 'video/mp4',
+      formatName: 'mov,mp4,m4a,3gp,3g2,mj2',
+      videoCodec: 'h264',
+      audioCodec: 'aac',
+      fileSizeBytes: 1234567,
     );
   }
 
@@ -61,6 +65,10 @@ void main() {
     expect(info.height, 1080);
     expect(info.bitrate, 3000000);
     expect(info.mimeType, 'video/mp4');
+    expect(info.formatName, 'mov,mp4,m4a,3gp,3g2,mj2');
+    expect(info.videoCodec, 'h264');
+    expect(info.audioCodec, 'aac');
+    expect(info.fileSizeBytes, 1234567);
   });
 
   test('public API delegates backendInfo to platform implementation', () async {
@@ -91,6 +99,10 @@ void main() {
       'rotation': 90,
       'bitrate': 1000000,
       'mimeType': 'video/quicktime',
+      'formatName': 'mov,mp4,m4a,3gp,3g2,mj2',
+      'videoCodec': 'h264',
+      'audioCodec': 'aac',
+      'fileSizeBytes': 345678,
     });
 
     expect(info.duration, const Duration(milliseconds: 1200));
@@ -99,6 +111,19 @@ void main() {
     expect(info.rotation, 90);
     expect(info.bitrate, 1000000);
     expect(info.mimeType, 'video/quicktime');
+    expect(info.formatName, 'mov,mp4,m4a,3gp,3g2,mj2');
+    expect(info.videoCodec, 'h264');
+    expect(info.audioCodec, 'aac');
+    expect(info.fileSizeBytes, 345678);
+  });
+
+  test('VideoInfo keeps new metadata fields optional', () {
+    final info = VideoInfo.fromMap(<Object?, Object?>{'durationMs': 1200});
+
+    expect(info.formatName, isNull);
+    expect(info.videoCodec, isNull);
+    expect(info.audioCodec, isNull);
+    expect(info.fileSizeBytes, isNull);
   });
 
   test('VideoProcessException maps PlatformException code', () {

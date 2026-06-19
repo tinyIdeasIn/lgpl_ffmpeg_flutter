@@ -23,6 +23,10 @@ void main() {
                 'rotation': 0,
                 'bitrate': 3000000,
                 'mimeType': 'video/mp4',
+                'formatName': 'mov,mp4,m4a,3gp,3g2,mj2',
+                'videoCodec': 'h264',
+                'audioCodec': 'aac',
+                'fileSizeBytes': 1234567,
               };
             case 'backendInfo':
               return <String, Object?>{
@@ -53,6 +57,7 @@ void main() {
       final info = await platform.readInfo(videoPath: '/tmp/video.mp4');
 
       expect(info.duration, const Duration(milliseconds: 12345));
+      expect(info.videoCodec, 'h264');
       expect(calls.single.method, 'readInfo');
       expect(calls.single.arguments, <String, Object?>{
         'videoPath': '/tmp/video.mp4',

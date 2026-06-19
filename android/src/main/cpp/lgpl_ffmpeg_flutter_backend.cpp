@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <sys/stat.h>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -135,6 +136,22 @@ std::string MimeTypeForInput(const std::string& path,
   return "";
 }
 
+int64_t FileSizeBytes(const std::string& path) {
+  struct stat stat_buffer {};
+  if (stat(path.c_str(), &stat_buffer) != 0 || stat_buffer.st_size < 0) {
+    return -1;
+  }
+  return static_cast<int64_t>(stat_buffer.st_size);
+}
+
+std::string CodecNameForStream(const AVStream* stream) {
+  if (stream == nullptr || stream->codecpar == nullptr) {
+    return "";
+  }
+  const char* name = avcodec_get_name(stream->codecpar->codec_id);
+  return name == nullptr ? "" : name;
+}
+
 bool OpenVideo(const std::string& path,
                AVFormatContext** format_context,
                int* video_stream_index) {
@@ -172,6 +189,12 @@ std::string ReadInfo(const std::string& path) {
 
   AVStream* stream = format_context->streams[video_stream_index];
   AVCodecParameters* codecpar = stream->codecpar;
+  const int audio_stream_index = av_find_best_stream(
+      format_context, AVMEDIA_TYPE_AUDIO, -1, -1, nullptr, 0);
+  AVStream* audio_stream = audio_stream_index >= 0
+                               ? format_context->streams[audio_stream_index]
+                               : nullptr;
+  const int64_t file_size_bytes = FileSizeBytes(path);
   std::ostringstream json;
   json << "{";
   json << "\"durationMs\":" << DurationMs(format_context) << ",";
@@ -184,7 +207,29 @@ std::string ReadInfo(const std::string& path) {
     json << "\"bitrate\":null,";
   }
   json << "\"mimeType\":\""
-       << EscapeJson(MimeTypeForInput(path, format_context->iformat)) << "\"";
+       << EscapeJson(MimeTypeForInput(path, format_context->iformat)) << "\",";
+  json << "\"formatName\":";
+  if (format_context->iformat != nullptr &&
+      format_context->iformat->name != nullptr) {
+    json << "\"" << EscapeJson(format_context->iformat->name) << "\",";
+  } else {
+    json << "null,";
+  }
+  json << "\"videoCodec\":\"" << EscapeJson(CodecNameForStream(stream))
+       << "\",";
+  json << "\"audioCodec\":";
+  const std::string audio_codec = CodecNameForStream(audio_stream);
+  if (!audio_codec.empty()) {
+    json << "\"" << EscapeJson(audio_codec) << "\",";
+  } else {
+    json << "null,";
+  }
+  json << "\"fileSizeBytes\":";
+  if (file_size_bytes >= 0) {
+    json << file_size_bytes;
+  } else {
+    json << "null";
+  }
   json << "}";
 
   avformat_close_input(&format_context);

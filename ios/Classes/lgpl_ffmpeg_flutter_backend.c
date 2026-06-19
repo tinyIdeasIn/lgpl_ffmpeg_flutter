@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 
 const char* lgpl_ffmpeg_flutter_backend_status(void) {
@@ -141,6 +142,22 @@ static const char* mime_type_for_input(const char* path,
   return "";
 }
 
+static long long file_size_bytes(const char* path) {
+  struct stat stat_buffer;
+  if (stat(path, &stat_buffer) != 0 || stat_buffer.st_size < 0) {
+    return -1;
+  }
+  return (long long)stat_buffer.st_size;
+}
+
+static const char* codec_name_for_stream(const AVStream* stream) {
+  if (stream == NULL || stream->codecpar == NULL) {
+    return "";
+  }
+  const char* name = avcodec_get_name(stream->codecpar->codec_id);
+  return name == NULL ? "" : name;
+}
+
 static int open_video(const char* path,
                       AVFormatContext** format_context,
                       int* video_stream_index) {
@@ -174,21 +191,48 @@ char* lgpl_ffmpeg_flutter_read_info(const char* video_path) {
 
   AVStream* stream = format_context->streams[video_stream_index];
   AVCodecParameters* codecpar = stream->codecpar;
-  char buffer[1024];
+  int audio_stream_index =
+      av_find_best_stream(format_context, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+  AVStream* audio_stream =
+      audio_stream_index >= 0 ? format_context->streams[audio_stream_index] : NULL;
+  char buffer[1536];
   const char* mime_type = mime_type_for_input(video_path, format_context->iformat);
+  const char* format_name =
+      format_context->iformat != NULL && format_context->iformat->name != NULL
+          ? format_context->iformat->name
+          : "";
+  const char* video_codec = codec_name_for_stream(stream);
+  const char* audio_codec = codec_name_for_stream(audio_stream);
+  long long size_bytes = file_size_bytes(video_path);
+  const char* audio_codec_prefix = strlen(audio_codec) > 0 ? "\"" : "";
+  const char* audio_codec_suffix = strlen(audio_codec) > 0 ? "\"" : "";
+  char file_size_json[32];
+  if (size_bytes >= 0) {
+    snprintf(file_size_json, sizeof(file_size_json), "%lld", size_bytes);
+  } else {
+    snprintf(file_size_json, sizeof(file_size_json), "null");
+  }
   if (format_context->bit_rate > 0) {
     snprintf(buffer, sizeof(buffer),
              "{\"durationMs\":%lld,\"width\":%d,\"height\":%d,"
-             "\"rotation\":%d,\"bitrate\":%lld,\"mimeType\":\"%s\"}",
+             "\"rotation\":%d,\"bitrate\":%lld,\"mimeType\":\"%s\","
+             "\"formatName\":\"%s\",\"videoCodec\":\"%s\","
+             "\"audioCodec\":%s%s%s,\"fileSizeBytes\":%s}",
              duration_ms(format_context), codecpar->width, codecpar->height,
              rotation_for_stream(stream), (long long)format_context->bit_rate,
-             mime_type);
+             mime_type, format_name, video_codec, audio_codec_prefix,
+             strlen(audio_codec) > 0 ? audio_codec : "null", audio_codec_suffix,
+             file_size_json);
   } else {
     snprintf(buffer, sizeof(buffer),
              "{\"durationMs\":%lld,\"width\":%d,\"height\":%d,"
-             "\"rotation\":%d,\"bitrate\":null,\"mimeType\":\"%s\"}",
+             "\"rotation\":%d,\"bitrate\":null,\"mimeType\":\"%s\","
+             "\"formatName\":\"%s\",\"videoCodec\":\"%s\","
+             "\"audioCodec\":%s%s%s,\"fileSizeBytes\":%s}",
              duration_ms(format_context), codecpar->width, codecpar->height,
-             rotation_for_stream(stream), mime_type);
+             rotation_for_stream(stream), mime_type, format_name, video_codec,
+             audio_codec_prefix, strlen(audio_codec) > 0 ? audio_codec : "null",
+             audio_codec_suffix, file_size_json);
   }
   avformat_close_input(&format_context);
   return duplicate_string(buffer);
