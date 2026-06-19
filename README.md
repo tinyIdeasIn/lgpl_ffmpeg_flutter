@@ -1,6 +1,6 @@
 # lgpl_ffmpeg_flutter
 
-[![pub package](https://img.shields.io/badge/pub-0.1.0-blue.svg)](https://pub.dev/packages/lgpl_ffmpeg_flutter)
+[![pub package](https://img.shields.io/badge/pub-0.1.1-blue.svg)](https://pub.dev/packages/lgpl_ffmpeg_flutter)
 
 Controlled Flutter plugin for reading local video metadata and extracting a
 cover frame through LGPL FFmpeg dynamic libraries.
