@@ -18,6 +18,7 @@ extern "C" {
 #include <libavutil/display.h>
 #include <libavutil/ffversion.h>
 #include <libavutil/imgutils.h>
+#include <libavutil/mastering_display_metadata.h>
 #include <libavutil/pixdesc.h>
 #include <libswscale/swscale.h>
 }
@@ -295,6 +296,192 @@ int64_t FrameTimeMs(const AVFrame* frame, const AVStream* stream) {
                       AVRational{1, 1000});
 }
 
+double ClampDouble(double value, double min_value, double max_value) {
+  return std::max(min_value, std::min(max_value, value));
+}
+
+int ClampInt(int value, int min_value, int max_value) {
+  return std::max(min_value, std::min(max_value, value));
+}
+
+AVColorTransferCharacteristic TransferForFrame(
+    const AVFrame* frame,
+    const AVCodecContext* codec_context) {
+  AVColorTransferCharacteristic transfer = frame->color_trc;
+  if (transfer == AVCOL_TRC_UNSPECIFIED && codec_context != nullptr) {
+    transfer = codec_context->color_trc;
+  }
+  return transfer;
+}
+
+AVColorPrimaries PrimariesForFrame(const AVFrame* frame,
+                                   const AVCodecContext* codec_context) {
+  AVColorPrimaries primaries = frame->color_primaries;
+  if (primaries == AVCOL_PRI_UNSPECIFIED && codec_context != nullptr) {
+    primaries = codec_context->color_primaries;
+  }
+  return primaries;
+}
+
+AVColorSpace ColorSpaceForFrame(const AVFrame* frame,
+                                const AVCodecContext* codec_context) {
+  AVColorSpace color_space = frame->colorspace;
+  if (color_space == AVCOL_SPC_UNSPECIFIED && codec_context != nullptr) {
+    color_space = codec_context->colorspace;
+  }
+  return color_space;
+}
+
+int BitsPerComponentForFrame(const AVFrame* frame,
+                             const AVCodecContext* codec_context) {
+  AVPixelFormat format = static_cast<AVPixelFormat>(frame->format);
+  if (format == AV_PIX_FMT_NONE && codec_context != nullptr) {
+    format = codec_context->pix_fmt;
+  }
+  const AVPixFmtDescriptor* descriptor = av_pix_fmt_desc_get(format);
+  return descriptor != nullptr ? descriptor->comp[0].depth : 0;
+}
+
+bool HasHdrSideData(const AVFrame* frame) {
+  return av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA) !=
+             nullptr ||
+         av_frame_get_side_data(frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL) !=
+             nullptr;
+}
+
+bool NeedsHdrToneMapping(const AVFrame* frame,
+                         const AVCodecContext* codec_context) {
+  const AVColorTransferCharacteristic transfer =
+      TransferForFrame(frame, codec_context);
+  if (transfer == AVCOL_TRC_SMPTE2084 || transfer == AVCOL_TRC_ARIB_STD_B67) {
+    return true;
+  }
+  if (transfer != AVCOL_TRC_UNSPECIFIED) {
+    return false;
+  }
+
+  if (HasHdrSideData(frame)) {
+    return true;
+  }
+  const AVColorSpace color_space = ColorSpaceForFrame(frame, codec_context);
+  return PrimariesForFrame(frame, codec_context) == AVCOL_PRI_BT2020 &&
+         (color_space == AVCOL_SPC_BT2020_NCL ||
+          color_space == AVCOL_SPC_BT2020_CL) &&
+         BitsPerComponentForFrame(frame, codec_context) >= 10;
+}
+
+double PqToNits(double encoded) {
+  constexpr double m1 = 2610.0 / 16384.0;
+  constexpr double m2 = 2523.0 / 32.0;
+  constexpr double c1 = 3424.0 / 4096.0;
+  constexpr double c2 = 2413.0 / 128.0;
+  constexpr double c3 = 2392.0 / 128.0;
+  const double power = std::pow(ClampDouble(encoded, 0.0, 1.0), 1.0 / m2);
+  const double numerator = std::max(power - c1, 0.0);
+  const double denominator = std::max(c2 - c3 * power, 1e-9);
+  return 10000.0 * std::pow(numerator / denominator, 1.0 / m1);
+}
+
+double HlgToNits(double encoded) {
+  constexpr double a = 0.17883277;
+  constexpr double b = 0.28466892;
+  constexpr double c = 0.55991073;
+  encoded = ClampDouble(encoded, 0.0, 1.0);
+  const double linear =
+      encoded <= 0.5 ? encoded * encoded / 3.0
+                     : (std::exp((encoded - c) / a) + b) / 12.0;
+  return linear * 1000.0;
+}
+
+double ToneMapNitsToSdr(double nits, double knee_nits) {
+  nits = std::max(0.0, nits);
+  return ClampDouble(nits / (nits + knee_nits), 0.0, 1.0);
+}
+
+double SrgbEncode(double linear) {
+  linear = ClampDouble(linear, 0.0, 1.0);
+  if (linear <= 0.0031308) {
+    return linear * 12.92;
+  }
+  return 1.055 * std::pow(linear, 1.0 / 2.4) - 0.055;
+}
+
+void ConvertBt2020ToBt709(double* r, double* g, double* b) {
+  const double source_r = *r;
+  const double source_g = *g;
+  const double source_b = *b;
+  *r = 1.6605 * source_r - 0.5876 * source_g - 0.0728 * source_b;
+  *g = -0.1246 * source_r + 1.1329 * source_g - 0.0083 * source_b;
+  *b = -0.0182 * source_r - 0.1006 * source_g + 1.1187 * source_b;
+}
+
+int SwsColorSpaceForFrame(const AVFrame* frame, const AVCodecContext* codec_context) {
+  AVColorSpace color_space = ColorSpaceForFrame(frame, codec_context);
+
+  switch (color_space) {
+    case AVCOL_SPC_BT709:
+      return SWS_CS_ITU709;
+    case AVCOL_SPC_SMPTE170M:
+    case AVCOL_SPC_BT470BG:
+      return SWS_CS_SMPTE170M;
+    case AVCOL_SPC_SMPTE240M:
+      return SWS_CS_SMPTE240M;
+    case AVCOL_SPC_BT2020_NCL:
+    case AVCOL_SPC_BT2020_CL:
+      return SWS_CS_BT2020;
+    default:
+      return SWS_CS_DEFAULT;
+  }
+}
+
+bool ConfigureSwsColorspace(SwsContext* sws_context,
+                            const AVFrame* frame,
+                            const AVCodecContext* codec_context) {
+  AVColorRange color_range = frame->color_range;
+  if (color_range == AVCOL_RANGE_UNSPECIFIED && codec_context != nullptr) {
+    color_range = codec_context->color_range;
+  }
+
+  const int source_range = color_range == AVCOL_RANGE_JPEG ? 1 : 0;
+  const int* coefficients =
+      sws_getCoefficients(SwsColorSpaceForFrame(frame, codec_context));
+  return sws_setColorspaceDetails(sws_context, coefficients, source_range,
+                                  sws_getCoefficients(SWS_CS_DEFAULT), 1, 0,
+                                  1 << 16, 1 << 16) >= 0;
+}
+
+double MaxMasteringLuminanceNits(const AVFrame* frame) {
+  const AVFrameSideData* side_data =
+      av_frame_get_side_data(frame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
+  if (side_data == nullptr || side_data->data == nullptr) {
+    return 0.0;
+  }
+  const auto* metadata =
+      reinterpret_cast<const AVMasteringDisplayMetadata*>(side_data->data);
+  if (!metadata->has_luminance) {
+    return 0.0;
+  }
+  return av_q2d(metadata->max_luminance);
+}
+
+double MaxContentLightLevelNits(const AVFrame* frame) {
+  const AVFrameSideData* side_data =
+      av_frame_get_side_data(frame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
+  if (side_data == nullptr || side_data->data == nullptr) {
+    return 0.0;
+  }
+  const auto* metadata =
+      reinterpret_cast<const AVContentLightMetadata*>(side_data->data);
+  return static_cast<double>(metadata->MaxCLL);
+}
+
+double HdrMetadataPeakNits(const AVFrame* frame) {
+  const double mastering_max = MaxMasteringLuminanceNits(frame);
+  const double max_cll = MaxContentLightLevelNits(frame);
+  double peak = std::max(mastering_max, max_cll);
+  return peak > 0.0 ? ClampDouble(peak, 400.0, 10000.0) : 0.0;
+}
+
 bool WritePngFile(const std::string& output_path, const AVFrame* rgb_frame) {
   const AVCodec* codec = avcodec_find_encoder(AV_CODEC_ID_PNG);
   if (codec == nullptr) {
@@ -349,6 +536,128 @@ AVFrame* AllocateRgbFrame(int width, int height) {
     return nullptr;
   }
   return frame;
+}
+
+AVFrame* AllocateRgb48Frame(int width, int height) {
+  AVFrame* frame = av_frame_alloc();
+  if (frame == nullptr) {
+    return nullptr;
+  }
+  frame->format = AV_PIX_FMT_RGB48LE;
+  frame->width = width;
+  frame->height = height;
+  if (av_frame_get_buffer(frame, 32) < 0) {
+    av_frame_free(&frame);
+    return nullptr;
+  }
+  return frame;
+}
+
+std::vector<double> BuildHdrToNitsTable(AVColorTransferCharacteristic transfer) {
+  std::vector<double> table(65536);
+  for (int i = 0; i <= 65535; i++) {
+    const double encoded = static_cast<double>(i) / 65535.0;
+    table[i] = transfer == AVCOL_TRC_ARIB_STD_B67 ? HlgToNits(encoded)
+                                                   : PqToNits(encoded);
+  }
+  return table;
+}
+
+std::vector<uint8_t> BuildSrgbEncodeTable() {
+  std::vector<uint8_t> table(4097);
+  for (int i = 0; i <= 4096; i++) {
+    table[i] = static_cast<uint8_t>(
+        std::lround(SrgbEncode(static_cast<double>(i) / 4096.0) * 255.0));
+  }
+  return table;
+}
+
+double EstimatePeakLuminanceNits(const AVFrame* source,
+                                 const std::vector<double>& hdr_to_nits,
+                                 bool convert_bt2020) {
+  double peak = 0.0;
+  const int step_x = std::max(1, source->width / 160);
+  const int step_y = std::max(1, source->height / 90);
+  for (int y = 0; y < source->height; y += step_y) {
+    const uint16_t* source_row =
+        reinterpret_cast<const uint16_t*>(source->data[0] +
+                                          y * source->linesize[0]);
+    for (int x = 0; x < source->width; x += step_x) {
+      double r = hdr_to_nits[source_row[x * 3]];
+      double g = hdr_to_nits[source_row[x * 3 + 1]];
+      double b = hdr_to_nits[source_row[x * 3 + 2]];
+      if (convert_bt2020) {
+        ConvertBt2020ToBt709(&r, &g, &b);
+      }
+      peak = std::max(peak, std::max({r, g, b}));
+    }
+  }
+  return peak;
+}
+
+double ToneMapKneeNits(double metadata_peak_nits, double frame_peak_nits) {
+  double reference_peak = frame_peak_nits;
+  if (metadata_peak_nits > 0.0) {
+    reference_peak = reference_peak > 0.0
+                         ? std::min(metadata_peak_nits, reference_peak)
+                         : metadata_peak_nits;
+  }
+  if (reference_peak <= 0.0) {
+    return 300.0;
+  }
+  return ClampDouble(reference_peak * 0.35, 180.0, 500.0);
+}
+
+AVFrame* ToneMapHdrRgbFrame(const AVFrame* source,
+                            const AVFrame* metadata_frame,
+                            const AVCodecContext* codec_context) {
+  AVFrame* destination = AllocateRgbFrame(source->width, source->height);
+  if (destination == nullptr) {
+    return nullptr;
+  }
+
+  const AVColorTransferCharacteristic transfer =
+      TransferForFrame(metadata_frame, codec_context);
+  const bool convert_bt2020 =
+      PrimariesForFrame(metadata_frame, codec_context) == AVCOL_PRI_BT2020;
+  const std::vector<double> hdr_to_nits = BuildHdrToNitsTable(transfer);
+  const std::vector<uint8_t> srgb_encode = BuildSrgbEncodeTable();
+  const double frame_peak =
+      EstimatePeakLuminanceNits(source, hdr_to_nits, convert_bt2020);
+  const double knee_nits =
+      ToneMapKneeNits(HdrMetadataPeakNits(metadata_frame), frame_peak);
+  for (int y = 0; y < source->height; y++) {
+    const uint16_t* source_row =
+        reinterpret_cast<const uint16_t*>(source->data[0] +
+                                          y * source->linesize[0]);
+    uint8_t* destination_row = destination->data[0] + y * destination->linesize[0];
+    for (int x = 0; x < source->width; x++) {
+      double r = hdr_to_nits[source_row[x * 3]];
+      double g = hdr_to_nits[source_row[x * 3 + 1]];
+      double b = hdr_to_nits[source_row[x * 3 + 2]];
+      if (convert_bt2020) {
+        ConvertBt2020ToBt709(&r, &g, &b);
+      }
+      r = std::max(0.0, r);
+      g = std::max(0.0, g);
+      b = std::max(0.0, b);
+      const double luminance = r * 0.2126 + g * 0.7152 + b * 0.0722;
+      const double tone_mapped_luminance =
+          ToneMapNitsToSdr(luminance, knee_nits);
+      const double scale =
+          luminance > 1e-9 ? tone_mapped_luminance / luminance : 0.0;
+      destination_row[x * 3] =
+          srgb_encode[ClampInt(static_cast<int>(std::lround(r * scale * 4096.0)),
+                               0, 4096)];
+      destination_row[x * 3 + 1] =
+          srgb_encode[ClampInt(static_cast<int>(std::lround(g * scale * 4096.0)),
+                               0, 4096)];
+      destination_row[x * 3 + 2] =
+          srgb_encode[ClampInt(static_cast<int>(std::lround(b * scale * 4096.0)),
+                               0, 4096)];
+    }
+  }
+  return destination;
 }
 
 void CopyRgbPixel(const AVFrame* source,
@@ -473,34 +782,83 @@ std::string GenerateCover(const std::string& path,
   const int out_width = std::max(1, static_cast<int>(source_width * scale));
   const int out_height = std::max(1, static_cast<int>(source_height * scale));
 
-  AVFrame* rgb_frame = AllocateRgbFrame(out_width, out_height);
-  if (rgb_frame == nullptr) {
+  const bool needs_hdr_tone_mapping =
+      NeedsHdrToneMapping(decoded_frame, codec_context);
+  AVFrame* scaled_frame = needs_hdr_tone_mapping
+                              ? AllocateRgb48Frame(out_width, out_height)
+                              : AllocateRgbFrame(out_width, out_height);
+  if (scaled_frame == nullptr) {
     av_frame_free(&decoded_frame);
     avcodec_free_context(&codec_context);
     avformat_close_input(&format_context);
     return ErrorJson("outputFailed", "Could not allocate cover frame.");
   }
 
+  AVPixelFormat source_format = codec_context->pix_fmt;
+  if (needs_hdr_tone_mapping) {
+    source_format = static_cast<AVPixelFormat>(decoded_frame->format);
+    if (source_format == AV_PIX_FMT_NONE) {
+      source_format = codec_context->pix_fmt;
+    }
+  }
   SwsContext* sws_context = sws_getContext(
-      source_width, source_height, codec_context->pix_fmt, out_width, out_height,
-      AV_PIX_FMT_RGB24, SWS_BILINEAR, nullptr, nullptr, nullptr);
+      source_width, source_height, source_format, out_width, out_height,
+      needs_hdr_tone_mapping ? AV_PIX_FMT_RGB48LE : AV_PIX_FMT_RGB24,
+      SWS_BILINEAR, nullptr, nullptr, nullptr);
   if (sws_context == nullptr) {
-    av_frame_free(&rgb_frame);
+    av_frame_free(&scaled_frame);
     av_frame_free(&decoded_frame);
     avcodec_free_context(&codec_context);
     avformat_close_input(&format_context);
     return ErrorJson("outputFailed", "Could not create scaler.");
   }
+  if (needs_hdr_tone_mapping &&
+      !ConfigureSwsColorspace(sws_context, decoded_frame, codec_context)) {
+    sws_freeContext(sws_context);
+    av_frame_free(&scaled_frame);
+    av_frame_free(&decoded_frame);
+    avcodec_free_context(&codec_context);
+    avformat_close_input(&format_context);
+    return ErrorJson("outputFailed", "Could not configure HDR colorspace.");
+  }
 
-  sws_scale(sws_context, decoded_frame->data, decoded_frame->linesize, 0,
-            source_height, rgb_frame->data, rgb_frame->linesize);
+  const int scaled_height =
+      sws_scale(sws_context, decoded_frame->data, decoded_frame->linesize, 0,
+                source_height, scaled_frame->data, scaled_frame->linesize);
+  if (scaled_height != out_height) {
+    sws_freeContext(sws_context);
+    av_frame_free(&scaled_frame);
+    av_frame_free(&decoded_frame);
+    avcodec_free_context(&codec_context);
+    avformat_close_input(&format_context);
+    return ErrorJson("outputFailed", "Could not scale cover frame.");
+  }
+
+  AVFrame* tone_mapped_frame = nullptr;
+  AVFrame* rgb_frame = scaled_frame;
+  if (needs_hdr_tone_mapping) {
+    tone_mapped_frame =
+        ToneMapHdrRgbFrame(scaled_frame, decoded_frame, codec_context);
+    if (tone_mapped_frame == nullptr) {
+      sws_freeContext(sws_context);
+      av_frame_free(&scaled_frame);
+      av_frame_free(&decoded_frame);
+      avcodec_free_context(&codec_context);
+      avformat_close_input(&format_context);
+      return ErrorJson("outputFailed", "Could not tone-map HDR cover frame.");
+    }
+    rgb_frame = tone_mapped_frame;
+  }
 
   AVFrame* cover_frame = rgb_frame;
   AVFrame* rotated_frame = RotateRgbFrame(rgb_frame, rotation);
   if (rotation != 0) {
     if (rotated_frame == nullptr) {
       sws_freeContext(sws_context);
-      av_frame_free(&rgb_frame);
+      if (tone_mapped_frame != nullptr) {
+        av_frame_free(&tone_mapped_frame);
+      }
+      av_frame_free(&scaled_frame);
       av_frame_free(&decoded_frame);
       avcodec_free_context(&codec_context);
       avformat_close_input(&format_context);
@@ -518,26 +876,34 @@ std::string GenerateCover(const std::string& path,
     if (rotated_frame != nullptr) {
       av_frame_free(&rotated_frame);
     }
-    av_frame_free(&rgb_frame);
+    if (tone_mapped_frame != nullptr) {
+      av_frame_free(&tone_mapped_frame);
+    }
+    av_frame_free(&scaled_frame);
     av_frame_free(&decoded_frame);
     avcodec_free_context(&codec_context);
     avformat_close_input(&format_context);
     return ErrorJson("outputFailed", "Could not create cover file.");
   }
 
+  const int cover_width = cover_frame->width;
+  const int cover_height = cover_frame->height;
   sws_freeContext(sws_context);
   if (rotated_frame != nullptr) {
     av_frame_free(&rotated_frame);
   }
-  av_frame_free(&rgb_frame);
+  if (tone_mapped_frame != nullptr) {
+    av_frame_free(&tone_mapped_frame);
+  }
+  av_frame_free(&scaled_frame);
   av_frame_free(&decoded_frame);
   avcodec_free_context(&codec_context);
   avformat_close_input(&format_context);
 
   std::ostringstream result;
   result << "{\"coverPath\":\"" << EscapeJson(output_path.str()) << "\",";
-  result << "\"width\":" << cover_frame->width << ",";
-  result << "\"height\":" << cover_frame->height << ",";
+  result << "\"width\":" << cover_width << ",";
+  result << "\"height\":" << cover_height << ",";
   result << "\"requestedTimeMs\":" << requested_time_ms << ",";
   result << "\"actualTimeMs\":";
   if (actual_time_ms >= 0) {
