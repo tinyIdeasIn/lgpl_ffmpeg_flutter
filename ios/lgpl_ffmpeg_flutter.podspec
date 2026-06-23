@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'lgpl_ffmpeg_flutter'
-  s.version          = '0.0.1'
+  s.version          = '0.1.2'
   s.summary          = 'Controlled Flutter wrapper around LGPL FFmpeg.'
   s.description      = <<-DESC
 Controlled Flutter wrapper around LGPL FFmpeg dynamic libraries for video info and cover extraction.

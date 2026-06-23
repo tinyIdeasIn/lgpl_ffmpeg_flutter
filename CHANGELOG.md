@@ -1,3 +1,12 @@
+## 0.1.2
+
+* Added HDR-aware cover generation on Android and iOS with PQ and HLG tone
+  mapping to SDR PNG output.
+* Improved BT.2020 HDR cover color conversion before writing generated cover
+  images.
+* Preserved the existing cover generation API and structured result fields for
+  SDR and HDR videos.
+
 ## 0.1.1
 
 * Expanded README examples for metadata reading, backend diagnostics, cover
