@@ -18,10 +18,10 @@ Controlled Flutter wrapper around LGPL FFmpeg dynamic libraries for video info a
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
 
-  # Flutter.framework does not contain a i386 slice.
+  # Bundled FFmpeg simulator frameworks only contain arm64 slices.
   s.pod_target_xcconfig = {
     'DEFINES_MODULE' => 'YES',
-    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386',
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386 x86_64',
     'HEADER_SEARCH_PATHS' => '$(inherited) "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libavcodec.framework/Headers" "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libavformat.framework/Headers" "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libavutil.framework/Headers" "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libswresample.framework/Headers" "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libswscale.framework/Headers"',
     'OTHER_LDFLAGS' => '$(inherited) -framework "libavcodec" -framework "libavformat" -framework "libavutil" -framework "libswresample" -framework "libswscale"',
   }
