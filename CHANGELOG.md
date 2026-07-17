@@ -1,3 +1,8 @@
+## 0.1.4
+
+* Fixed dependent iOS Simulator app targets by forwarding the unsupported
+  `i386` and `x86_64` architecture exclusions to user targets.
+
 ## 0.1.3
 
 * Fixed iOS Simulator builds for dependent apps by excluding unsupported
