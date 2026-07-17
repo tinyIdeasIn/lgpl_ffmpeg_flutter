@@ -1,3 +1,8 @@
+## 0.1.3
+
+* Fixed iOS Simulator builds for dependent apps by excluding unsupported
+  `i386` and `x86_64` architectures from the FFmpeg plugin Pod target.
+
 ## 0.1.2
 
 * Added HDR-aware cover generation on Android and iOS with PQ and HLG tone
