@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'lgpl_ffmpeg_flutter'
-  s.version          = '0.1.3'
+  s.version          = '0.1.4'
   s.summary          = 'Controlled Flutter wrapper around LGPL FFmpeg.'
   s.description      = <<-DESC
 Controlled Flutter wrapper around LGPL FFmpeg dynamic libraries for video info and cover extraction.
@@ -24,6 +24,9 @@ Controlled Flutter wrapper around LGPL FFmpeg dynamic libraries for video info a
     'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386 x86_64',
     'HEADER_SEARCH_PATHS' => '$(inherited) "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libavcodec.framework/Headers" "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libavformat.framework/Headers" "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libavutil.framework/Headers" "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libswresample.framework/Headers" "${PODS_XCFRAMEWORKS_BUILD_DIR}/lgpl_ffmpeg_flutter/libswscale.framework/Headers"',
     'OTHER_LDFLAGS' => '$(inherited) -framework "libavcodec" -framework "libavformat" -framework "libavutil" -framework "libswresample" -framework "libswscale"',
+  }
+  s.user_target_xcconfig = {
+    'EXCLUDED_ARCHS[sdk=iphonesimulator*]' => 'i386 x86_64',
   }
   s.swift_version = '5.0'
 
